@@ -1,0 +1,54 @@
+name: Deploy AWS CDK Stack
+
+on:
+  push:
+    branches:
+      - main # Deploy to `prod` only on `main`
+  pull_request:
+    branches:
+      - main # Deploy PRs to `staging`
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install CDK & Dependencies
+        run: |
+          npm install -g aws-cdk
+          npm install
+
+      - name: Run CDK Synth
+        run: cdk synth
+
+      - name: Deploy to AWS
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "🚀 Deploying to PROD environment"
+            cdk deploy --context stage=prod --require-approval never
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "🚀 Deploying PR to STAGING environment"
+            cdk deploy --context stage=staging --require-approval never
+          fi
