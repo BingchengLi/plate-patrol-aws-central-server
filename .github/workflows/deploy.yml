@@ -15,15 +15,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          path: repo # Explicitly check out into 'repo'
+
       - name: Debug Directory Structure
         run: |
           echo "Current directory: $(pwd)"
           ls -lah
-
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+          echo "Checking repo directory:"
+          ls -lah repo
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -43,14 +45,17 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Install CDK & Dependencies
+        working-directory: repo # Set working directory
         run: |
           npm install -g aws-cdk
           npm install
 
       - name: Run CDK Synth
+        working-directory: repo
         run: cdk synth
 
       - name: Deploy to AWS
+        working-directory: repo
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "🚀 Deploying to PROD environment"
