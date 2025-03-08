@@ -1,3 +1,4 @@
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Construct } from "constructs";
 import * as path from "path";
@@ -15,5 +16,13 @@ export class Lambdas {
         WATCHLIST_TABLE: watchlistTable,
       },
     });
+
+    // Grant Lambda permissions to read from DynamoDB
+    this.detectionsLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:GetItem"],
+        resources: [`arn:aws:dynamodb:*:*:table/${watchlistTable}`],
+      })
+    );
   }
 }

@@ -32,14 +32,35 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       api,
     });
 
-    api.deploymentStage = new apigateway.Stage(this, `Stage-${stage}`, {
+    const stageDeployment = new apigateway.Stage(this, `Stage-${stage}`, {
       deployment,
       stageName: stage,
     });
 
-    // Add `GET /detections/{plate_number}` Endpoint
-    api.root
-      .addResource("detections")
+    api.deploymentStage = stageDeployment;
+
+    // ================== Resources ==================
+    // ----------------- /detections -------------------
+    // GET /detections - should return a 400 error
+    const detectionsResource = api.root.addResource("detections");
+    detectionsResource.addMethod(
+      "GET",
+      new apigateway.MockIntegration({
+        integrationResponses: [
+          {
+            statusCode: "400",
+            responseTemplates: {
+              "application/json": `{"error": "plate_number is required"}`,
+            },
+          },
+        ],
+        requestTemplates: { "application/json": `{}` },
+      }),
+      { methodResponses: [{ statusCode: "400" }] }
+    );
+
+    // GET /detections/{plate_number} - should call the Lambda function
+    detectionsResource
       .addResource("{plate_number}")
       .addMethod("GET", new apigateway.LambdaIntegration(detectionsLambda));
 
