@@ -23,10 +23,10 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+      - name: Setup AWS CLI
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
