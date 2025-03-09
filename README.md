@@ -6,6 +6,9 @@ Plate Patrol is a crowdsourced Automatic License Plate Recognition (ALPR) system
 
 This repository contains the backend implementation for the Plate Patrol Central Server, including its API endpoints, database schemas, and cloud deployment details.
 
+### Central Server Block Diagram 
+![Capstone Block Diagram - New Central Server](https://github.com/user-attachments/assets/91c02207-999e-41b4-81b7-e66fc978ca04)
+
 ### Authors
 
 - Christine Li
