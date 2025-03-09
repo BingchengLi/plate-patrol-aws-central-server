@@ -72,7 +72,6 @@ exports.handler = async (event) => {
       statusCode: 200,
       body: JSON.stringify({
         match: true,
-        tracking_info: Item.tracking_info || [],
         upload_url: preSignedUrl, // Pre-signed URL for uploading match data
         file_key: fileName, // File path in S3
       }),
