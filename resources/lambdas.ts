@@ -59,6 +59,7 @@ export class Lambdas {
           "dynamodb:PutItem",
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
+          "dynamodb:Scan",
         ],
         resources: [`arn:aws:dynamodb:*:*:table/${watchlistTable}`],
       })

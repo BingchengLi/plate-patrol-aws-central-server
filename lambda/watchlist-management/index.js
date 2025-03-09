@@ -5,6 +5,7 @@ const {
   PutCommand,
   UpdateCommand,
   DeleteCommand,
+  ScanCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
 const client = new DynamoDBClient({});
