@@ -1,14 +1,62 @@
-# Welcome to your CDK TypeScript project
+# Plate Patrol AWS Central Server
 
-This is a blank project for CDK development with TypeScript.
+## Overview
+Plate Patrol is a crowdsourced Automatic License Plate Recognition (ALPR) system designed to enhance public safety by leveraging everyday dash cams. The Central Server is a critical backend component that processes incoming license plate detections, matches them against law enforcement watchlists, and alerts officers in real time.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+This repository contains the backend implementation for the Plate Patrol Central Server, including its API endpoints, database schemas, and cloud deployment details.
 
-## Useful commands
+### Authors
+- Christine Li
+- Vicky Liu
+- Andy Zhao
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+### Affiliation
+Electrical and Computer Engineering, Carnegie Mellon University
+
+## Features
+- **Real-Time ALPR Matching**: Processes incoming license plate detections from dash cams and checks against the law enforcement watchlist.
+- **Secure Watchlist Management**: Officers can add/remove plates to track specific vehicles.
+- **Automated Notification**s: Sends real-time alerts to officers when a tracked plate is detected.
+- **Scalability**: Uses AWS services (Lambda, DynamoDB, RDS, S3, SNS, SQS) for high-throughput, low-latency processing.
+- **Web App Integration**: Provides RESTful APIs for the Plate Patrol web app.
+
+## Technology Stack
+- **Cloud Infrastructure**: AWS services (Lambda, DynamoDB, RDS, S3, SNS, SQS)
+- **Programming Language**: TypeScript, JavaScript
+- **Infrastructure as Code**: AWS CDK (Cloud Development Kit)
+- **Testing**: Jest for unit testing
+
+## Getting Started
+### Prerequisites
+- AWS Account
+- Node.js and npm installed
+- AWS CLI configured
+
+### Installation
+1. Clone the repository:
+   ```
+   git clone https://github.com/BingchengLi/plate-patrol-aws-central-server.git
+   cd plate-patrol-aws-central-server
+   ```
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Deploy the application using AWS CDK:
+   ```
+   cdk deploy
+   ```
+
+### Deployment Stages
+The project utilizes different environments in the AWS CDK stack for deployment:
+- **Development (`dev`)**: The default environment for local development and testing. This environment is used for ongoing feature development and initial testing.
+- **Staging (`staging`)**: This environment is used for integration testing and validation. It simulates the production environment to ensure all features work correctly before going live.
+- **Production (`prod`)**: The final environment where the application is deployed for end-users. Only thoroughly tested and approved changes should be deployed here.
+
+Note: When you run `cdk deploy`, the default environment is set to development (`dev`). You can specify a different environment by passing in the context:
+```
+cdk deploy --context stage=staging
+```
+
+## Usage
+Once deployed, the central server will process incoming license plate detection requests from dash cams. Law enforcement can access the system through the web interface to manage watchlists and receive notifications for matched plates.
