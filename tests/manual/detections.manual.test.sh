@@ -47,7 +47,7 @@ curl -X GET "$API_URL/detections/UNKNOWN123" -H "Content-Type: application/json"
 echo -e "\n"
 
 # Test 3: Query with missing plate_number (Expect: error)
-echo "-  Test 3: Missing plate_number (Expect: 400 Bad Request)"
+echo "-  Test 3: Missing plate_number (Expect: error)"
 curl -X GET "$API_URL/detections" -H "Content-Type: application/json"
 echo -e "\n"
 
