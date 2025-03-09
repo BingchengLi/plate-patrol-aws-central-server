@@ -12,7 +12,7 @@ jobs:
   integrate:
     runs-on: ubuntu-latest
     outputs:
-      synth-success: ${{ steps.synth.outcome == 'success' }}
+      synth-success: ${{ steps.synth.outcome }}
 
     steps:
       - name: Checkout code
