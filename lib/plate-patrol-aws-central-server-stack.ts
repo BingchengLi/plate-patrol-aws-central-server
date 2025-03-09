@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Tables } from "../resources/tables";
 import { Lambdas } from "../resources/lambdas";
 
@@ -16,8 +17,18 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     const tables = new Tables(this, stage); // Pass stage name to tables
     const watchlistTable = tables.watchlistTable;
 
+    // Create S3 Bucket for match uploads
+    const s3Bucket = new s3.Bucket(this, `MatchUploadsBucket-${stage}`, {
+      bucketName: `match-uploads-${stage}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Do not delete bucket on stack deletion (for security)
+    });
+
     // Create Lambda Functions
-    const lambdas = new Lambdas(this, watchlistTable.tableName);
+    const lambdas = new Lambdas(
+      this,
+      watchlistTable.tableName,
+      s3Bucket.bucketName
+    );
     const detectionsLambda = lambdas.detectionsLambda;
 
     // Create API Gateway **without default `prod`**
