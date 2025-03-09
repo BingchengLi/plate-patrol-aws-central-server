@@ -33,6 +33,7 @@ Electrical and Computer Engineering, Carnegie Mellon University
 - **Programming Language**: TypeScript, JavaScript
 - **Infrastructure as Code**: AWS CDK (Cloud Development Kit)
 - **Testing**: Jest for unit testing
+- **CI/CD**: GitHub Actions for automated testing & deployment
 
 ## Getting Started
 
