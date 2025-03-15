@@ -7,7 +7,12 @@ export class Lambdas {
   public readonly detectionsLambda: lambda.Function;
   public readonly watchlistManagementLambda: lambda.Function;
 
-  constructor(scope: Construct, watchlistTable: string, s3Bucket: string) {
+  constructor(
+    scope: Construct,
+    watchlistTable: string,
+    auditLogTable: string,
+    s3Bucket: string
+  ) {
     // Define /detections Lambda
     this.detectionsLambda = new lambda.Function(scope, "DetectionsLambda", {
       runtime: lambda.Runtime.NODEJS_18_X,
@@ -47,6 +52,7 @@ export class Lambdas {
         ),
         environment: {
           WATCHLIST_TABLE: watchlistTable,
+          AUDIT_LOG_TABLE: auditLogTable,
         },
       }
     );

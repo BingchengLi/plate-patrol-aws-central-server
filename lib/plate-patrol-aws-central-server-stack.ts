@@ -16,6 +16,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     // Create Tables
     const tables = new Tables(this, stage); // Pass stage name to tables
     const watchlistTable = tables.watchlistTable;
+    const auditLogTable = tables.auditLogTable;
 
     // Create S3 Bucket for match uploads
     const s3Bucket = new s3.Bucket(this, `MatchUploadsBucket-${stage}`, {
@@ -27,6 +28,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     const lambdas = new Lambdas(
       this,
       watchlistTable.tableName,
+      auditLogTable.tableName,
       s3Bucket.bucketName
     );
     const detectionsLambda = lambdas.detectionsLambda;
@@ -79,36 +81,24 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       .addResource("{plate_number}")
       .addMethod("GET", new apigateway.LambdaIntegration(detectionsLambda));
 
-    // ----------------- /plates -------------------
+    // ================== /plates API ==================
     const platesResource = api.root.addResource("plates");
-    // GET /plates
+
+    // GET /plates - Internal use only
     platesResource.addMethod(
       "GET",
-      new apigateway.LambdaIntegration(watchlistManagementLambda)
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      { authorizationType: apigateway.AuthorizationType.IAM } // Restrict to internal use
     );
 
-    const platesResourceWithPlateNumber =
-      platesResource.addResource("{plate_number}");
-    // GET /plates/{plate_number}
-    platesResourceWithPlateNumber.addMethod(
-      "GET",
-      new apigateway.LambdaIntegration(watchlistManagementLambda)
-    );
-
-    // POST /plates
+    // PUT /plates - Public API to add a plate to the watchlist
     platesResource.addMethod(
-      "POST",
-      new apigateway.LambdaIntegration(watchlistManagementLambda)
+      "PUT",
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true, // Require API Key for PUT
+      }
     );
-
-    // DELETE /plates/{plate_number}/officers/{officer_id}
-    platesResourceWithPlateNumber
-      .addResource("officers")
-      .addResource("{officer_id}")
-      .addMethod(
-        "DELETE",
-        new apigateway.LambdaIntegration(watchlistManagementLambda)
-      );
 
     // Output base URL of the API Gateway
     new cdk.CfnOutput(this, `ApiUrl-${stage}`, {
