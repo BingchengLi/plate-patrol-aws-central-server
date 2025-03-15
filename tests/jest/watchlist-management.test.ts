@@ -49,7 +49,7 @@ describe("Watchlist API Tests", () => {
     const plates = response.data;
 
     const plateExists = plates.some(
-      (entry) => entry.plate_number === PLATE_NUMBER
+      (entry: { plate_number: string }) => entry.plate_number === PLATE_NUMBER
     );
     expect(plateExists).toBe(true);
   });
@@ -71,7 +71,7 @@ describe("Watchlist API Tests", () => {
 
     expect(plateDetails).toHaveProperty("tracking_officers");
     const trackedOfficers = plateDetails.tracking_officers.map(
-      (officer) => officer.officer_id
+      (officer: { officer_id: any }) => officer.officer_id
     );
     expect(trackedOfficers).toEqual(
       expect.arrayContaining([OFFICER_1, OFFICER_2])
