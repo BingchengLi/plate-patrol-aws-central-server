@@ -1,5 +1,3 @@
-// Adapted from: https://jestjs.io/docs/dynamodb
-
 import request from "supertest";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
@@ -13,26 +11,26 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Define API Gateway URL
-const API_URL: string =
-  process.env.API_URL ||
-  "https://xat4qx9kpj.execute-api.us-east-2.amazonaws.com/dev";
+const API_BASE_URL = process.env.API_URL || "http://localhost:3000";
+const STAGE = process.env.STAGE || "dev";
+const API_URL = `${API_BASE_URL}/${STAGE}`;
+
+const TEST_PLATE = "XYZ123";
+const UNKNOWN_PLATE = "UNKNOWN123";
 
 // Configure AWS DynamoDB
 const ddbClient = new DynamoDBClient({
   region: process.env.AWS_REGION || "us-east-2",
 });
 const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
-const TABLE_NAME: string = process.env.TABLE_NAME || "global_watchlist_dev";
+const WATCHLIST_TABLE = process.env.WATCHLIST_TABLE || "global_watchlist_dev";
 
-// Define test plate number
-const TEST_PLATE = "XYZ123";
-
-describe("Watchlist Query Layer API", () => {
+describe("/detections API Integration Tests", () => {
   beforeAll(async () => {
-    console.log(`Setting up test plate: ${TEST_PLATE}`);
+    console.log(`Setting up test plate in DynamoDB: ${TEST_PLATE}`);
 
     const putParams = {
-      TableName: TABLE_NAME,
+      TableName: WATCHLIST_TABLE,
       Item: {
         plate_number: TEST_PLATE,
         tracking_info: {
@@ -45,48 +43,51 @@ describe("Watchlist Query Layer API", () => {
   });
 
   afterAll(async () => {
-    console.log(`Cleaning up test plate: ${TEST_PLATE}`);
+    console.log(`Cleaning up test plate from DynamoDB: ${TEST_PLATE}`);
 
     const deleteParams = {
-      TableName: TABLE_NAME,
+      TableName: WATCHLIST_TABLE,
       Key: { plate_number: TEST_PLATE },
     };
 
     await dynamoDB.send(new DeleteCommand(deleteParams));
   });
 
-  // Test 1: Check if plate is in watchlist
-  test("Should detect a plate in the watchlist", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/${TEST_PLATE}`)
-      .expect(200);
+  // ============== Test Known Plate Detection ==============
+  it("should detect a plate that exists in the watchlist", async () => {
+    const response = await request(API_URL).get(`/detections/${TEST_PLATE}`);
 
-    expect(response.body.match).toBe(true);
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveProperty("match", true);
+    expect(response.body).toHaveProperty("plate_number", TEST_PLATE);
     expect(response.body.tracking_info).toHaveProperty("officer-1");
     expect(response.body.tracking_info["officer-1"].reason).toBe("stolen");
   });
 
-  // Test 2: Check if an unknown plate is NOT in watchlist
-  test("Should return match=false for a plate NOT in the watchlist", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/UNKNOWN123`)
-      .expect(200);
-    expect(response.body.match).toBe(false);
+  // ============== Test Unknown Plate Detection ==============
+  it("should return match=false for a plate not in the watchlist", async () => {
+    const response = await request(API_URL).get(`/detections/${UNKNOWN_PLATE}`);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toHaveProperty("match", false);
+    expect(response.body).toHaveProperty("plate_number", UNKNOWN_PLATE);
   });
 
-  // Test 3: Ensure error when querying without plate_number
-  test("Should return an error when querying without a plate_number", async () => {
-    const response = await request(API_URL).get(`/detections`).expect(500);
+  // ============== Test Missing Plate Number ==============
+  it("should return an error when querying without a plate_number", async () => {
+    const response = await request(API_URL).get(`/detections`);
+
+    expect(response.statusCode).toBe(404); // API Gateway should return 404 if the route is incorrect
   });
 
-  // Test 4: Ensure Pre-signed S3 URL is generated for image upload
-  test("Should generate a valid pre-signed S3 URL for match upload", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/${TEST_PLATE}`)
-      .expect(200);
+  // ============== Test Pre-signed S3 URL Generation ==============
+  it("should generate a valid pre-signed S3 URL for match upload", async () => {
+    const response = await request(API_URL).get(`/detections/${TEST_PLATE}`);
+
+    expect(response.statusCode).toBe(200);
 
     if (response.body.match) {
-      expect(response.body.upload_url).toBeDefined();
+      expect(response.body).toHaveProperty("upload_url");
       expect(response.body.upload_url).toContain("https://");
       expect(response.body.upload_url).toContain(".s3.");
       expect(response.body.upload_url).toContain("amazonaws.com/");

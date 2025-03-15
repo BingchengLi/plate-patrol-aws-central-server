@@ -1,11 +1,10 @@
-import { APIGatewayEvent } from "aws-lambda";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const {
   DynamoDBDocumentClient,
   ScanCommand,
   PutCommand,
-} from "@aws-sdk/lib-dynamodb";
-import { v4 as uuidv4 } from "uuid";
+  GetCommand,
+} = require("@aws-sdk/lib-dynamodb");
 
 const client = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(client);
@@ -14,7 +13,6 @@ const WATCHLIST_TABLE = process.env.WATCHLIST_TABLE;
 const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
 
 // Mapping of API keys to user identifiers
-// Future improvement: Store this in a secure location like AWS Secrets Manager
 const API_KEY_MAP = {
   RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs: "dev",
 };
@@ -24,17 +22,6 @@ exports.handler = async (event) => {
 
   try {
     const { httpMethod, body, headers } = event;
-
-    // Extract API Key from headers
-    const apiKey = headers["x-api-key"];
-    if (!apiKey || !API_KEY_MAP[apiKey]) {
-      return {
-        statusCode: 403,
-        body: JSON.stringify({ error: "Unauthorized: Invalid API Key" }),
-      };
-    }
-
-    const added_by = API_KEY_MAP[apiKey];
 
     // ================== GET /plates ==================
     if (httpMethod === "GET") {
@@ -48,9 +35,19 @@ exports.handler = async (event) => {
 
     // ================== PUT /plates ==================
     if (httpMethod === "PUT") {
+      // Extract API Key from headers
+      const apiKey = headers["x-api-key"];
+      if (!apiKey || !API_KEY_MAP[apiKey]) {
+        return {
+          statusCode: 403,
+          body: JSON.stringify({ error: "Unauthorized: Invalid API Key" }),
+        };
+      }
+
+      const added_by = API_KEY_MAP[apiKey];
       const { plate_number, reason } = JSON.parse(body || "{}");
 
-      // ✅ Validate required fields
+      // Validate required fields
       if (!plate_number || !reason) {
         return {
           statusCode: 400,
@@ -61,16 +58,32 @@ exports.handler = async (event) => {
       }
 
       const timestamp = new Date().toISOString();
-      const log_id = uuidv4();
 
-      // Add plate to watchlist if it doesn't already exist
+      // Check if plate already exists
+      const getParams = {
+        TableName: WATCHLIST_TABLE,
+        Key: { plate_number },
+      };
+
+      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
+
+      if (existingPlate.Item) {
+        console.log(`Plate ${plate_number} already exists. Skipping insert.`);
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            message: "Plate already exists, skipping insert.",
+          }),
+        };
+      }
+
+      // Add plate to watchlist
       const putWatchlistParams = {
         TableName: WATCHLIST_TABLE,
         Item: {
           plate_number,
           reason,
         },
-        ConditionExpression: "attribute_not_exists(plate_number)",
       };
 
       await dynamoDB.send(new PutCommand(putWatchlistParams));
@@ -79,7 +92,6 @@ exports.handler = async (event) => {
       const putAuditParams = {
         TableName: AUDIT_LOG_TABLE,
         Item: {
-          log_id,
           plate_number,
           reason,
           added_by,
@@ -91,7 +103,7 @@ exports.handler = async (event) => {
 
       return {
         statusCode: 200,
-        body: JSON.stringify({ message: "Plate added to watchlist", log_id }),
+        body: JSON.stringify({ message: "Plate added to watchlist" }),
       };
     }
 

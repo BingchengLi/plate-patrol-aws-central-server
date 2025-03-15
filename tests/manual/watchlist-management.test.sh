@@ -1,5 +1,10 @@
 #!/bin/bash
 
+############################################
+# Manual Tests for Watchlist Management API
+#! Warning: This test is outdated and needs to be updated
+############################################
+
 # Set the stage (dev, staging, prod)
 STAGE="dev"
 

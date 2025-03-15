@@ -87,8 +87,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     // GET /plates - Internal use only
     platesResource.addMethod(
       "GET",
-      new apigateway.LambdaIntegration(watchlistManagementLambda),
-      { authorizationType: apigateway.AuthorizationType.IAM } // Restrict to internal use
+      new apigateway.LambdaIntegration(watchlistManagementLambda)
     );
 
     // PUT /plates - Public API to add a plate to the watchlist
