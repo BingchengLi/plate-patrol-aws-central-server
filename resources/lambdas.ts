@@ -24,7 +24,7 @@ export class Lambdas {
       },
     });
 
-    // Grant Lambda permissions to read from DynamoDB
+    // Grant Lambda permissions to read from watchlist DynamoDB table
     this.detectionsLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["dynamodb:GetItem"],
@@ -57,7 +57,7 @@ export class Lambdas {
       }
     );
 
-    // Grant Lambda permissions to read, write, update, and delete from DynamoDB
+    // Grant Lambda permissions to read, write, update, and delete from watchlist DynamoDB table
     this.watchlistManagementLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -68,6 +68,14 @@ export class Lambdas {
           "dynamodb:Scan",
         ],
         resources: [`arn:aws:dynamodb:*:*:table/${watchlistTable}`],
+      })
+    );
+
+    // Grant Lambda permissions to write to audit log DynamoDB table
+    this.watchlistManagementLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:PutItem"],
+        resources: [`arn:aws:dynamodb:*:*:table/${auditLogTable}`],
       })
     );
   }

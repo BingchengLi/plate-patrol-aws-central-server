@@ -22,7 +22,7 @@ describe("/plates integration tests", () => {
       `/plates/${TEST_PLATE_NUMBER}`
     );
     expect(response.statusCode).toBe(200);
-    expect(response.body).toEqual({ message: "Plate deleted from watchlist" });
+    expect(response.body).toEqual({ message: "Plate removed from watchlist" });
     console.log("Test plate deleted from the watchlist");
   });
 
