@@ -5,6 +5,7 @@ import * as path from "path";
 
 export class Lambdas {
   public readonly detectionsLambda: lambda.Function;
+  public readonly watchlistManagementLambda: lambda.Function;
 
   constructor(scope: Construct, watchlistTable: string, s3Bucket: string) {
     // Define /detections Lambda
@@ -31,6 +32,36 @@ export class Lambdas {
       new iam.PolicyStatement({
         actions: ["s3:PutObject"],
         resources: [`arn:aws:s3:::${s3Bucket}/*`],
+      })
+    );
+
+    // Define /watchlist-management Lambda
+    this.watchlistManagementLambda = new lambda.Function(
+      scope,
+      "WatchlistManagementLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "index.handler",
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "../lambda/watchlist-management")
+        ),
+        environment: {
+          WATCHLIST_TABLE: watchlistTable,
+        },
+      }
+    );
+
+    // Grant Lambda permissions to read, write, update, and delete from DynamoDB
+    this.watchlistManagementLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+        ],
+        resources: [`arn:aws:dynamodb:*:*:table/${watchlistTable}`],
       })
     );
   }

@@ -30,6 +30,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       s3Bucket.bucketName
     );
     const detectionsLambda = lambdas.detectionsLambda;
+    const watchlistManagementLambda = lambdas.watchlistManagementLambda;
 
     // Create API Gateway **without default `prod`**
     const api = new apigateway.RestApi(this, `PlatePatrolAPI-${stage}`, {
@@ -39,10 +40,13 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     });
 
     // Create a Deployment and Associate it with a Custom Stage (dev, staging, prod)
-    const deployment = new apigateway.Deployment(this, `Deployment-${stage}`, {
-      api,
-    });
-
+    const deployment = new apigateway.Deployment(
+      this,
+      `Deployment-${stage}-${Date.now()}`, // force a new deployment on each stack update
+      {
+        api,
+      }
+    );
     const stageDeployment = new apigateway.Stage(this, `Stage-${stage}`, {
       deployment,
       stageName: stage,
@@ -74,6 +78,37 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     detectionsResource
       .addResource("{plate_number}")
       .addMethod("GET", new apigateway.LambdaIntegration(detectionsLambda));
+
+    // ----------------- /plates -------------------
+    const platesResource = api.root.addResource("plates");
+    // GET /plates
+    platesResource.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(watchlistManagementLambda)
+    );
+
+    const platesResourceWithPlateNumber =
+      platesResource.addResource("{plate_number}");
+    // GET /plates/{plate_number}
+    platesResourceWithPlateNumber.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(watchlistManagementLambda)
+    );
+
+    // POST /plates
+    platesResource.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(watchlistManagementLambda)
+    );
+
+    // DELETE /plates/{plate_number}/officers/{officer_id}
+    platesResourceWithPlateNumber
+      .addResource("officers")
+      .addResource("{officer_id}")
+      .addMethod(
+        "DELETE",
+        new apigateway.LambdaIntegration(watchlistManagementLambda)
+      );
 
     // Output base URL of the API Gateway
     new cdk.CfnOutput(this, `ApiUrl-${stage}`, {
