@@ -93,6 +93,7 @@ exports.handler = async (event) => {
       const putAuditParams = {
         TableName: AUDIT_LOG_TABLE,
         Item: {
+          log_id: `log-${Date.now()}`,
           plate_number,
           reason,
           added_by,
