@@ -18,8 +18,14 @@ const TEST_REASON = "Suspicious vehicle";
 describe("/plates integration tests", () => {
   afterAll(async () => {
     // Clean up the test plate from the watchlist
-    // Since we don't have a DELETE endpoint, we'll just remove it manually
+    const response = await request(API_URL).delete(
+      `/plates/${TEST_PLATE_NUMBER}`
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual({ message: "Plate deleted from watchlist" });
+    console.log("Test plate deleted from the watchlist");
   });
+
   // ============== Test Unauthorized Requests ==============
   it("should return 403 for missing API key", async () => {
     const response = await request(API_URL)

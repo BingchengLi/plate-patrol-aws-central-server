@@ -107,6 +107,42 @@ exports.handler = async (event) => {
       };
     }
 
+    // ================== DELETE /plates/{plate_number} ==================
+    if (httpMethod === "DELETE") {
+      if (!event.pathParameters || !event.pathParameters.plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+
+      const plate_number = event.pathParameters.plate_number;
+
+      // Check if plate exists
+      const getParams = { TableName: WATCHLIST_TABLE, Key: { plate_number } };
+      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
+
+      if (!existingPlate.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: "Plate not found in watchlist" }),
+        };
+      }
+
+      // Remove plate from watchlist
+      await dynamoDB.send(
+        new DeleteCommand({
+          TableName: WATCHLIST_TABLE,
+          Key: { plate_number },
+        })
+      );
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Plate removed from watchlist" }),
+      };
+    }
+
     return {
       statusCode: 400,
       body: JSON.stringify({ error: "Invalid request" }),

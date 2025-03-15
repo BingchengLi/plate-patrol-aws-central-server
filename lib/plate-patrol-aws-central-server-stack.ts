@@ -84,7 +84,9 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     // ================== /plates API ==================
     const platesResource = api.root.addResource("plates");
 
-    // GET /plates - Internal use only
+    // GET /plates - Get the list of plates in the watchlist
+    // Internal use only
+    // TODO: Improve this to require an dev IAM role
     platesResource.addMethod(
       "GET",
       new apigateway.LambdaIntegration(watchlistManagementLambda)
@@ -98,6 +100,14 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
         apiKeyRequired: true, // Require API Key for PUT
       }
     );
+
+    // DELETE /plates - Internal use only
+    platesResource
+      .addResource("{plate_number}")
+      .addMethod(
+        "DELETE",
+        new apigateway.LambdaIntegration(watchlistManagementLambda)
+      );
 
     // Output base URL of the API Gateway
     new cdk.CfnOutput(this, `ApiUrl-${stage}`, {
