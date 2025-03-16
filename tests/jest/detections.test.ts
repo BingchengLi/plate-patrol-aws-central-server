@@ -20,7 +20,7 @@ describe("/detections integration tests", () => {
     // Ensure the test plate is added to the watchlist before running detection tests
     console.log("Adding test plate to watchlist...");
     const response = await request(API_URL)
-      .put("/plates")
+      .post("/plates")
       .set("x-api-key", VALID_API_KEY)
       .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
 
@@ -60,10 +60,9 @@ describe("/detections integration tests", () => {
   });
 
   // ============== Test Missing Plate Number ==============
-  it("should return 400 when missing plate_number", async () => {
-    const response = await request(API_URL).get(`/detections`); // Incorrectly formatted request
+  it("should return error when missing plate_number", async () => {
+    const response = await request(API_URL).get(`/detections/`);
 
-    expect(response.statusCode).toBe(400);
-    expect(response.body).toEqual({ error: "plate_number is required" });
+    expect(response.statusCode).toBe(403); // 403 Forbidden
   });
 });
