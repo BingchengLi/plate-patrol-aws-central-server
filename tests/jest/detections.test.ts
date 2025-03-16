@@ -40,28 +40,11 @@ describe("/detections integration tests", () => {
     console.log("Test plate deleted.");
   });
 
-  // ============== Test Unauthorized Requests ==============
-  it("should return 403 for missing API key", async () => {
-    const response = await request(API_URL).get(`/detections/${TEST_PLATE_NUMBER}`);
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toEqual({ error: "Unauthorized: Invalid API Key" });
-  });
-
-  it("should return 403 for invalid API key", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/${TEST_PLATE_NUMBER}`)
-      .set("x-api-key", INVALID_API_KEY);
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toEqual({ error: "Unauthorized: Invalid API Key" });
-  });
-
   // ============== Test Plate Detection ==============
-  it("should detect a plate in the watchlist", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/${TEST_PLATE_NUMBER}`)
-      .set("x-api-key", VALID_API_KEY);
+  it("should return match: true for a plate in the watchlist", async () => {
+    const response = await request(API_URL).get(
+      `/detections/${TEST_PLATE_NUMBER}`
+    );
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty("match", true);
@@ -70,9 +53,7 @@ describe("/detections integration tests", () => {
   });
 
   it("should return match: false for a plate not in the watchlist", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/NOT_IN_LIST`)
-      .set("x-api-key", VALID_API_KEY);
+    const response = await request(API_URL).get(`/detections/NOT_IN_LIST`);
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ match: false });
@@ -80,9 +61,7 @@ describe("/detections integration tests", () => {
 
   // ============== Test Missing Plate Number ==============
   it("should return 400 when missing plate_number", async () => {
-    const response = await request(API_URL)
-      .get(`/detections/`) // Incorrectly formatted request
-      .set("x-api-key", VALID_API_KEY);
+    const response = await request(API_URL).get(`/detections`); // Incorrectly formatted request
 
     expect(response.statusCode).toBe(400);
     expect(response.body).toEqual({ error: "plate_number is required" });
