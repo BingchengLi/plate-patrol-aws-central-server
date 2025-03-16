@@ -29,7 +29,7 @@ describe("/plates integration tests", () => {
   // ============== Test Unauthorized Requests ==============
   it("should return 403 for missing API key", async () => {
     const response = await request(API_URL)
-      .put("/plates")
+      .post("/plates")
       .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
 
     expect(response.statusCode).toBe(403);
@@ -38,7 +38,7 @@ describe("/plates integration tests", () => {
 
   it("should return 403 for invalid API key", async () => {
     const response = await request(API_URL)
-      .put("/plates")
+      .post("/plates")
       .set("x-api-key", INVALID_API_KEY)
       .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
 
@@ -50,7 +50,7 @@ describe("/plates integration tests", () => {
   describe("Add plate to watchlist", () => {
     it("should successfully add a plate to the watchlist", async () => {
       const response = await request(API_URL)
-        .put("/plates")
+        .post("/plates")
         .set("x-api-key", VALID_API_KEY)
         .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
 
@@ -64,7 +64,7 @@ describe("/plates integration tests", () => {
     // ============== Test Duplicate Plate Addition ==============
     it("should return an error when adding a duplicate plate", async () => {
       const response = await request(API_URL)
-        .put("/plates")
+        .post("/plates")
         .set("x-api-key", VALID_API_KEY)
         .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
 
@@ -94,7 +94,7 @@ describe("/plates integration tests", () => {
   // ============== Test Adding Without Required Fields ==============
   it("should return 400 when missing plate_number", async () => {
     const response = await request(API_URL)
-      .put("/plates")
+      .post("/plates")
       .set("x-api-key", VALID_API_KEY)
       .send({ reason: TEST_REASON });
 
@@ -107,7 +107,7 @@ describe("/plates integration tests", () => {
   // ============== Test Adding Without Reason ==============
   it("should return 400 when missing reason", async () => {
     const response = await request(API_URL)
-      .put("/plates")
+      .post("/plates")
       .set("x-api-key", VALID_API_KEY)
       .send({ plate_number: TEST_PLATE_NUMBER });
 

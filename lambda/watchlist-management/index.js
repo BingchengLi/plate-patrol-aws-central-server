@@ -35,7 +35,7 @@ exports.handler = async (event) => {
     }
 
     // ================== PUT /plates ==================
-    if (httpMethod === "PUT") {
+    if (httpMethod === "POST") {
       // Extract API Key from headers
       const apiKey = headers["x-api-key"];
       if (!apiKey || !API_KEY_MAP[apiKey]) {

@@ -94,7 +94,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
 
     // PUT /plates - Public API to add a plate to the watchlist
     platesResource.addMethod(
-      "PUT",
+      "POST",
       new apigateway.LambdaIntegration(watchlistManagementLambda),
       {
         apiKeyRequired: true, // Require API Key for PUT
