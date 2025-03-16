@@ -1,182 +1,147 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
   ScanCommand,
+  PutCommand,
+  GetCommand,
+  DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
 const client = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(client);
 
 const WATCHLIST_TABLE = process.env.WATCHLIST_TABLE;
+const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
+
+// Mapping of API keys to user identifiers
+const API_KEY_MAP = {
+  RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs: "dev",
+};
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
   try {
-    const { httpMethod, pathParameters, body } = event;
+    const { httpMethod, body, headers } = event;
 
-    // ==============================Endpoints==============================
-    // GET /plates - List all plates in the watchlist
-    if (httpMethod === "GET" && !pathParameters) {
-      const params = {
-        TableName: WATCHLIST_TABLE,
-      };
-
+    // ================== GET /plates ==================
+    if (httpMethod === "GET") {
+      const params = { TableName: WATCHLIST_TABLE };
       const { Items } = await dynamoDB.send(new ScanCommand(params));
-
       return {
         statusCode: 200,
         body: JSON.stringify(Items || []),
       };
     }
 
-    // ------------------------------
-    // GET /plates/{plate_number} - Check if a plate is in the watchlist
-    if (httpMethod === "GET" && pathParameters?.plate_number) {
-      const plateNumber = pathParameters.plate_number;
-
-      const params = {
-        TableName: WATCHLIST_TABLE,
-        Key: { plate_number: plateNumber },
-      };
-
-      const { Item } = await dynamoDB.send(new GetCommand(params));
-
-      return {
-        statusCode: 200,
-        body: JSON.stringify(
-          Item
-            ? {
-                plate_number: plateNumber,
-                tracking_officers: Object.keys(Item.tracking_officers || {}),
-              }
-            : {}
-        ),
-      };
-    }
-
-    // ------------------------------
-    // POST /plates - Add a plate to the watchlist
+    // ================== PUT /plates ==================
     if (httpMethod === "POST") {
-      const { plate_number, officer_id, reason } = JSON.parse(body);
+      // Extract API Key from headers
+      const apiKey = headers["x-api-key"];
+      if (!apiKey || !API_KEY_MAP[apiKey]) {
+        return {
+          statusCode: 403,
+          body: JSON.stringify({ error: "Unauthorized: Invalid API Key" }),
+        };
+      }
 
-      if (!plate_number || !officer_id || !reason) {
+      const added_by = API_KEY_MAP[apiKey];
+      const { plate_number, reason } = JSON.parse(body || "{}");
+
+      // Validate required fields
+      if (!plate_number || !reason) {
         return {
           statusCode: 400,
-          body: JSON.stringify({ error: "Missing fields" }),
-        };
-      }
-
-      // Check if the plate already exists
-      const { Item } = await dynamoDB.send(
-        new GetCommand({
-          TableName: WATCHLIST_TABLE,
-          Key: { plate_number },
-        })
-      );
-
-      // If the plate already exists, append the officer to the tracking list
-      if (Item) {
-        const updateParams = {
-          TableName: WATCHLIST_TABLE,
-          Key: { plate_number },
-          UpdateExpression: "SET tracking_officers.#officer = :reason",
-          ExpressionAttributeNames: { "#officer": officer_id },
-          ExpressionAttributeValues: { ":reason": reason },
-          ReturnValues: "UPDATED_NEW",
-        };
-
-        await dynamoDB.send(new UpdateCommand(updateParams));
-
-        return {
-          statusCode: 200,
-          body: JSON.stringify({ message: "Officer added to tracking list" }),
-        };
-      }
-
-      // Otherwise, create a new entry
-      const putParams = {
-        TableName: WATCHLIST_TABLE,
-        Item: {
-          plate_number,
-          tracking_officers: { [officer_id]: reason },
-        },
-      };
-
-      await dynamoDB.send(new PutCommand(putParams));
-
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ message: "Plate added to global watchlist" }),
-      };
-    }
-
-    // ------------------------------
-    // DELETE /plates/{plate_number}/officers/{officer_id} - Remove an officer from tracking
-    if (
-      httpMethod === "DELETE" &&
-      pathParameters?.plate_number &&
-      pathParameters?.officer_id
-    ) {
-      const { plate_number, officer_id } = pathParameters;
-
-      // First retrieve the existing plate data
-      const { Item } = await dynamoDB.send(
-        new GetCommand({
-          TableName: WATCHLIST_TABLE,
-          Key: { plate_number },
-        })
-      );
-
-      if (!Item) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ message: "Plate not found" }),
-        };
-      }
-
-      // If the officer is not tracking this plate, return
-      if (!Item.tracking_officers?.[officer_id]) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ message: "Officer not tracking this plate" }),
-        };
-      }
-
-      // If this is the last officer tracking the plate, delete the entry
-      if (Object.keys(Item.tracking_officers).length === 1) {
-        await dynamoDB.send(
-          new DeleteCommand({
-            TableName: WATCHLIST_TABLE,
-            Key: { plate_number },
-          })
-        );
-        return {
-          statusCode: 200,
           body: JSON.stringify({
-            message: "Plate removed from global watchlist",
+            error: "Missing required fields: plate_number, reason",
           }),
         };
       }
 
-      // Otherwise, just remove this officer from the tracking list
-      const updateParams = {
+      const timestamp = new Date().toISOString();
+
+      // Check if plate already exists
+      const getParams = {
         TableName: WATCHLIST_TABLE,
         Key: { plate_number },
-        UpdateExpression: "REMOVE tracking_officers.#officer",
-        ExpressionAttributeNames: { "#officer": officer_id },
-        ReturnValues: "UPDATED_NEW",
       };
 
-      await dynamoDB.send(new UpdateCommand(updateParams));
+      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
+
+      if (existingPlate.Item) {
+        console.log(`Plate ${plate_number} already exists. Skipping insert.`);
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            message: "Plate already exists, skipping insert.",
+          }),
+        };
+      }
+
+      // Add plate to watchlist
+      const putWatchlistParams = {
+        TableName: WATCHLIST_TABLE,
+        Item: {
+          plate_number,
+          reason,
+        },
+      };
+
+      await dynamoDB.send(new PutCommand(putWatchlistParams));
+
+      // Log action in audit_logs table
+      const putAuditParams = {
+        TableName: AUDIT_LOG_TABLE,
+        Item: {
+          log_id: `log-${Date.now()}`,
+          plate_number,
+          reason,
+          added_by,
+          timestamp,
+        },
+      };
+
+      await dynamoDB.send(new PutCommand(putAuditParams));
 
       return {
         statusCode: 200,
-        body: JSON.stringify({ message: "Officer removed from tracking list" }),
+        body: JSON.stringify({ message: "Plate added to watchlist" }),
+      };
+    }
+
+    // ================== DELETE /plates/{plate_number} ==================
+    if (httpMethod === "DELETE") {
+      if (!event.pathParameters || !event.pathParameters.plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+
+      const plate_number = event.pathParameters.plate_number;
+
+      // Check if plate exists
+      const getParams = { TableName: WATCHLIST_TABLE, Key: { plate_number } };
+      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
+
+      if (!existingPlate.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: "Plate not found in watchlist" }),
+        };
+      }
+
+      // Remove plate from watchlist
+      await dynamoDB.send(
+        new DeleteCommand({
+          TableName: WATCHLIST_TABLE,
+          Key: { plate_number },
+        })
+      );
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Plate removed from watchlist" }),
       };
     }
 

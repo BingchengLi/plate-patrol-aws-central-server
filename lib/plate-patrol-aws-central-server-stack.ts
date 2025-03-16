@@ -16,6 +16,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     // Create Tables
     const tables = new Tables(this, stage); // Pass stage name to tables
     const watchlistTable = tables.watchlistTable;
+    const auditLogTable = tables.auditLogTable;
 
     // Create S3 Bucket for match uploads
     const s3Bucket = new s3.Bucket(this, `MatchUploadsBucket-${stage}`, {
@@ -27,6 +28,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     const lambdas = new Lambdas(
       this,
       watchlistTable.tableName,
+      auditLogTable.tableName,
       s3Bucket.bucketName
     );
     const detectionsLambda = lambdas.detectionsLambda;
@@ -56,55 +58,36 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
 
     // ================== Resources ==================
     // ----------------- /detections -------------------
-    // GET /detections - should return a 400 error
     const detectionsResource = api.root.addResource("detections");
-    detectionsResource.addMethod(
-      "GET",
-      new apigateway.MockIntegration({
-        integrationResponses: [
-          {
-            statusCode: "400",
-            responseTemplates: {
-              "application/json": `{"error": "plate_number is required"}`,
-            },
-          },
-        ],
-        requestTemplates: { "application/json": `{}` },
-      }),
-      { methodResponses: [{ statusCode: "400" }] }
-    );
 
     // GET /detections/{plate_number} - should call the Lambda function
     detectionsResource
       .addResource("{plate_number}")
       .addMethod("GET", new apigateway.LambdaIntegration(detectionsLambda));
 
-    // ----------------- /plates -------------------
+    // ================== /plates API ==================
     const platesResource = api.root.addResource("plates");
-    // GET /plates
+
+    // GET /plates - Get the list of plates in the watchlist
+    // Internal use only
+    // TODO: Improve this to require an dev IAM role
     platesResource.addMethod(
       "GET",
       new apigateway.LambdaIntegration(watchlistManagementLambda)
     );
 
-    const platesResourceWithPlateNumber =
-      platesResource.addResource("{plate_number}");
-    // GET /plates/{plate_number}
-    platesResourceWithPlateNumber.addMethod(
-      "GET",
-      new apigateway.LambdaIntegration(watchlistManagementLambda)
-    );
-
-    // POST /plates
+    // PUT /plates - Public API to add a plate to the watchlist
     platesResource.addMethod(
       "POST",
-      new apigateway.LambdaIntegration(watchlistManagementLambda)
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true, // Require API Key for PUT
+      }
     );
 
-    // DELETE /plates/{plate_number}/officers/{officer_id}
-    platesResourceWithPlateNumber
-      .addResource("officers")
-      .addResource("{officer_id}")
+    // DELETE /plates - Internal use only
+    platesResource
+      .addResource("{plate_number}")
       .addMethod(
         "DELETE",
         new apigateway.LambdaIntegration(watchlistManagementLambda)
