@@ -1,5 +1,10 @@
 #!/bin/bash
 
+#############################################
+# Manual Tests for GET /detections/{plate_number} API
+# ! This script is outdated - please refer to the jest tests in the /test/jest folder
+#############################################
+
 # Set the stage (dev, staging, prod)
 STAGE="dev"
 
