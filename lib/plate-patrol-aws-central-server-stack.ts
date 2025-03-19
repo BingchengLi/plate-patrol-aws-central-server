@@ -108,6 +108,9 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       new s3notifications.LambdaDestination(lambdas.uploadProcessingLambda)
     );
 
+    s3Bucket.grantPut(uploadProcessingLambda); // For uploads
+    s3Bucket.grantRead(uploadProcessingLambda); // For headObject
+
     // ================== Output ==================
     // Output base URL of the API Gateway
     new cdk.CfnOutput(this, `ApiUrl-${stage}`, {
