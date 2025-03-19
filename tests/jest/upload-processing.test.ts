@@ -59,19 +59,26 @@ describe("/upload-processing integration test", () => {
     expect(response.body).toHaveProperty("upload_url");
     expect(response.body).toHaveProperty("file_key");
 
+    console.log("Pre-Signed URL Response:", response.body);
     uploadUrl = response.body.upload_url;
     fileKey = response.body.file_key;
+
+    console.log("Generated Pre-Signed URL:", uploadUrl);
+    console.log("Generated S3 File Key:", fileKey);
   });
 
   it("should upload an image using the pre-signed URL", async () => {
     const imageData = fs.readFileSync(TEST_IMAGE_PATH);
-    console.log(`Uploading image to ${uploadUrl}`);
-    const response = await request(uploadUrl)
-      .put("/")
-      .set("Content-Type", "image/jpeg")
-      .send(imageData);
 
-    expect(response.statusCode).toBe(200);
+    console.log("Uploading image to:", uploadUrl);
+    console.log("Expected File Key:", fileKey);
+
+    const response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "image/jpeg" },
+      body: imageData,
+    });
+    expect(response.status).toBe(200);
   });
 
   it("should verify that the match is logged in DynamoDB", async () => {

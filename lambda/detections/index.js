@@ -68,6 +68,8 @@ exports.handler = async (event) => {
       }
     );
 
+    console.log("Generated pre-signed URL:", preSignedUrl, "for", fileName);
+
     return {
       statusCode: 200,
       body: JSON.stringify({

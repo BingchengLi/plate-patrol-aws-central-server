@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Tables } from "../resources/tables";
 import { Lambdas } from "../resources/lambdas";
 import * as s3notifications from "aws-cdk-lib/aws-s3-notifications";
@@ -27,6 +28,16 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       bucketName: `match-uploads-${stage}`,
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Do not delete bucket on stack deletion (for security)
     });
+
+    // Attach S3 Bucket Policy to allow pre-signed uploads
+    s3Bucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        principals: [new iam.AnyPrincipal()], // Allows uploads from any pre-signed URL
+        actions: ["s3:PutObject"],
+        resources: [`${s3Bucket.bucketArn}/matches/*`], // Restrict to "matches/" folder
+      })
+    );
 
     // ============== Lambdas ==============
     // Create Lambda Functions
