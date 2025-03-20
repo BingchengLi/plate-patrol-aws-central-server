@@ -92,7 +92,7 @@ describe("/upload-processing integration test", () => {
 
     expect(Item).toBeDefined();
     if (Item) {
-      expect(Item.file_path).toBe(fileKey);
+      expect(Item.match_id).toBe(fileKey);
     }
   });
 });

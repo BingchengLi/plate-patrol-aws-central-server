@@ -68,7 +68,6 @@ exports.handler = async (event) => {
           match_id: { S: key },
           plate_number: { S: plate_number },
           bucket_name: { S: bucket },
-          file_path: { S: key },
           gps_location:
             latitude !== null && longitude !== null
               ? {
@@ -101,11 +100,8 @@ const streamToBuffer = async (stream) => {
   return Buffer.concat(chunks);
 };
 
-// Helper function to convert EXIF GPS format to decimal degrees
-const _convertGPS = (gpsData, ref) => {
-  if (!gpsData || gpsData.length !== 3) return null;
-  const [degrees, minutes, seconds] = gpsData;
-  let decimal = degrees + minutes / 60 + seconds / 3600;
-  if (ref === "S" || ref === "W") decimal = -decimal; // South and West are negative
-  return decimal;
+// Helper function to convert GPS coordinates
+// Currently the input the already in decimal format, we might need to update depends on how dashcam store the GPS data
+const _convertGPS = (latitude, ref) => {
+  return latitude;
 };
