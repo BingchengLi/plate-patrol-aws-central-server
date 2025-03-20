@@ -90,7 +90,7 @@ export class Lambdas {
       "UploadProcessingLambda",
       {
         runtime: lambda.Runtime.NODEJS_18_X,
-        handler: "uploadProcessingLambda.handler", //
+        handler: "index.handler",
         code: lambda.Code.fromAsset(
           path.join(__dirname, "../lambda/upload-processing")
         ),
