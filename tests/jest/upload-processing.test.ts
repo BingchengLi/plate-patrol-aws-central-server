@@ -16,7 +16,7 @@ const API_URL = `${API_BASE_URL}/${STAGE}`;
 
 const VALID_API_KEY =
   process.env.VALID_API_KEY || "RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs";
-const TEST_PLATE_NUMBER = "TEST123";
+const TEST_PLATE_NUMBER = "TEST456";
 const TEST_REASON = "Testing upload pipeline";
 const TEST_IMAGE_PATH = path.join(
   __dirname,
@@ -25,7 +25,7 @@ const TEST_IMAGE_PATH = path.join(
 
 const dynamoClient = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
-const TABLE_NAME = process.env.MATCH_LOG_TABLE || "match_logs_dev";
+const TABLE_NAME = process.env.MATCH_LOG_TABLE || "match_logs_staging";
 
 // ============== Upload Processing Integration Test ==============
 describe("/upload-processing integration test", () => {
