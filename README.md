@@ -32,7 +32,7 @@ Electrical and Computer Engineering, Carnegie Mellon University
 - **Cloud Infrastructure**: AWS services (Lambda, DynamoDB, RDS, S3, SNS, SQS)
 - **Programming Language**: TypeScript, JavaScript
 - **Infrastructure as Code**: AWS CDK (Cloud Development Kit)
-- **Testing**: Jest for unit testing
+- **Testing**: Jest for unit and integration testing
 - **CI/CD**: GitHub Actions for automated testing & deployment
 
 ## Getting Started
