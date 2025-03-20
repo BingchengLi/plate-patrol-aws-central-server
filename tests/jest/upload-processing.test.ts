@@ -25,7 +25,7 @@ const TEST_IMAGE_PATH = path.join(
 
 const dynamoClient = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
-const TABLE_NAME = process.env.MATCH_LOG_TABLE || "match-log-dev";
+const TABLE_NAME = process.env.MATCH_LOG_TABLE || "match_logs_dev";
 
 // ============== Upload Processing Integration Test ==============
 describe("/upload-processing integration test", () => {
@@ -62,19 +62,15 @@ describe("/upload-processing integration test", () => {
     expect(response.body).toHaveProperty("upload_url");
     expect(response.body).toHaveProperty("file_key");
 
-    console.log("Pre-Signed URL Response:", response.body);
     uploadUrl = response.body.upload_url;
     fileKey = response.body.file_key;
 
-    console.log("Generated Pre-Signed URL:", uploadUrl);
-    console.log("Generated S3 File Key:", fileKey);
+    console.log(`Upload URL: ${uploadUrl}`);
+    console.log(`File Key: ${fileKey}`);
   });
 
   it("should upload an image using the pre-signed URL", async () => {
     const imageData = fs.readFileSync(TEST_IMAGE_PATH);
-
-    console.log("Uploading image to:", uploadUrl);
-    console.log("Expected File Key:", fileKey);
 
     const response = await fetch(uploadUrl, {
       method: "PUT",
@@ -85,12 +81,12 @@ describe("/upload-processing integration test", () => {
   });
 
   it("should verify that the match is logged in DynamoDB", async () => {
-    await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait for event processing
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for event processing
 
     const { Item } = await dynamoDB.send(
       new GetCommand({
         TableName: TABLE_NAME,
-        Key: { match_id: fileKey },
+        Key: { match_id: fileKey, plate_number: TEST_PLATE_NUMBER },
       })
     );
 
@@ -98,5 +94,5 @@ describe("/upload-processing integration test", () => {
     if (Item) {
       expect(Item.file_path).toBe(fileKey);
     }
-  }, 10000);
+  });
 });
