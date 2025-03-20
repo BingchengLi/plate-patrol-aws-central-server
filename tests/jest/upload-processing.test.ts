@@ -18,7 +18,10 @@ const VALID_API_KEY =
   process.env.VALID_API_KEY || "RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs";
 const TEST_PLATE_NUMBER = "TEST123";
 const TEST_REASON = "Testing upload pipeline";
-const TEST_IMAGE_PATH = path.join(__dirname, "../test-image.jpg");
+const TEST_IMAGE_PATH = path.join(
+  __dirname,
+  "../assets/test-image-processed.jpg"
+);
 
 const dynamoClient = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
