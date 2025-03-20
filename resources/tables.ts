@@ -4,6 +4,7 @@ import { Construct } from "constructs";
 export class Tables {
   public readonly watchlistTable: dynamodb.Table;
   public readonly auditLogTable: dynamodb.Table;
+  public readonly matchLogTable: dynamodb.Table;
 
   constructor(scope: Construct, stage: string) {
     // Watchlist Table - for storing watchlist data
@@ -25,6 +26,20 @@ export class Tables {
       },
       sortKey: {
         name: "timestamp",
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
+    // Match Log Table - for tracking matches between detections and the watchlist
+    this.matchLogTable = new dynamodb.Table(scope, `MatchLogTable-${stage}`, {
+      tableName: `match_logs_${stage}`,
+      partitionKey: {
+        name: "match_id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "plate_number",
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,

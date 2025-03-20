@@ -2,6 +2,7 @@
 *.d.ts
 node_modules
 .env
+*.zip
 
 # TypeScript output directory
 dist

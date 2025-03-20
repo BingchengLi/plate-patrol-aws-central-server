@@ -27,7 +27,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // ✅ Query DynamoDB using AWS SDK v3
+    // Query DynamoDB using AWS SDK v3
     const params = {
       TableName: WATCHLIST_TABLE,
       Key: { plate_number: plateNumber },
@@ -67,6 +67,8 @@ exports.handler = async (event) => {
         expiresIn: 300, // Expire in 5 minutes
       }
     );
+
+    console.log("Generated pre-signed URL:", preSignedUrl, "for", fileName);
 
     return {
       statusCode: 200,

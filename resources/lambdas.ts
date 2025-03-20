@@ -6,13 +6,16 @@ import * as path from "path";
 export class Lambdas {
   public readonly detectionsLambda: lambda.Function;
   public readonly watchlistManagementLambda: lambda.Function;
+  public readonly uploadProcessingLambda: lambda.Function;
 
   constructor(
     scope: Construct,
     watchlistTable: string,
     auditLogTable: string,
+    matchLogTable: string,
     s3Bucket: string
   ) {
+    // ================== Detections Lambda ==================
     // Define /detections Lambda
     this.detectionsLambda = new lambda.Function(scope, "DetectionsLambda", {
       runtime: lambda.Runtime.NODEJS_18_X,
@@ -35,11 +38,12 @@ export class Lambdas {
     // Grant Lambda permissions to generate pre-signed S3 URLs
     this.detectionsLambda.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ["s3:PutObject"],
+        actions: ["s3:PutObject", "s3:GetObject"],
         resources: [`arn:aws:s3:::${s3Bucket}/*`],
       })
     );
 
+    // ================== Watchlist Management Lambda ==================
     // Define /watchlist-management Lambda
     this.watchlistManagementLambda = new lambda.Function(
       scope,
@@ -76,6 +80,39 @@ export class Lambdas {
       new iam.PolicyStatement({
         actions: ["dynamodb:PutItem"],
         resources: [`arn:aws:dynamodb:*:*:table/${auditLogTable}`],
+      })
+    );
+
+    // ================== Upload Processing Lambda ==================
+    // Define upload-processing Lambda (triggered by S3 upload)
+    this.uploadProcessingLambda = new lambda.Function(
+      scope,
+      "UploadProcessingLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "index.handler",
+        code: lambda.Code.fromAsset(
+          path.join(__dirname, "../lambda/upload-processing")
+        ),
+        environment: {
+          MATCH_LOG_TABLE: matchLogTable,
+        },
+      }
+    );
+
+    // Grant Lambda permissions to write to match log DynamoDB table
+    this.uploadProcessingLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:PutItem"],
+        resources: [`arn:aws:dynamodb:*:*:table/${matchLogTable}`],
+      })
+    );
+
+    // Grant Lambda permissions to read from S3 bucket
+    this.uploadProcessingLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["s3:GetObject"],
+        resources: [`arn:aws:s3:::${s3Bucket}/*`],
       })
     );
   }
