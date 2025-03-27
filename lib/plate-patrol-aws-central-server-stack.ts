@@ -113,6 +113,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       );
 
     // ================== S3 Trigger ==================
+    // TODO: modify the logic to support chunked uploads
     // Attach S3 event notification to trigger the upload processing Lambda
     s3Bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
