@@ -22,7 +22,9 @@ export class Lambdas {
     this.detectionsLambda = new lambda.Function(scope, "DetectionsLambda", {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "index.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/detections")), // Path to Lambda
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../lambdas/detections")
+      ), // Path to Lambda
       environment: {
         WATCHLIST_TABLE: watchlistTable,
         UPLOAD_STATUS_TABLE: uploadStatusTable,
@@ -54,7 +56,7 @@ export class Lambdas {
         runtime: lambda.Runtime.NODEJS_18_X,
         handler: "index.handler",
         code: lambda.Code.fromAsset(
-          path.join(__dirname, "../lambda/watchlist-management")
+          path.join(__dirname, "../lambdas/watchlist-management")
         ),
         environment: {
           WATCHLIST_TABLE: watchlistTable,
@@ -94,7 +96,7 @@ export class Lambdas {
         runtime: lambda.Runtime.NODEJS_18_X,
         handler: "index.handler",
         code: lambda.Code.fromAsset(
-          path.join(__dirname, "../lambda/upload-processing")
+          path.join(__dirname, "../lambdas/upload-processing")
         ),
         environment: {
           MATCH_LOG_TABLE: matchLogTable,
@@ -127,7 +129,7 @@ export class Lambdas {
         runtime: lambda.Runtime.NODEJS_18_X,
         handler: "index.handler", // Adjust if your handler is named differently
         code: lambda.Code.fromAsset(
-          path.join(__dirname, "../lambda/chunk-upload-processing")
+          path.join(__dirname, "../lambdas/chunk-upload-processing")
         ), // Path to Lambda code
         environment: {
           S3_BUCKET: s3Bucket,
