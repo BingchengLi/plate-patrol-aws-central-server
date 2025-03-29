@@ -25,7 +25,7 @@ export class Lambdas {
       code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/detections")), // Path to Lambda
       environment: {
         WATCHLIST_TABLE: watchlistTable,
-        S3_BUCKET: s3Bucket,
+        UPLOAD_STATUS_TABLE: uploadStatusTable,
       },
     });
 
