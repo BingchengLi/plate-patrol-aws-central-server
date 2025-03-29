@@ -21,6 +21,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     const watchlistTable = tables.watchlistTable;
     const auditLogTable = tables.auditLogTable;
     const matchLogTable = tables.matchLogTable;
+    const uploadStatusTable = tables.uploadStatusTable;
 
     // ============== S3 Bucket ==============
     // Create S3 Bucket for match uploads
@@ -47,6 +48,7 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       watchlistTable.tableName,
       auditLogTable.tableName,
       matchLogTable.tableName,
+      uploadStatusTable.tableName,
       s3Bucket.bucketName
     );
     const detectionsLambda = lambdas.detectionsLambda;
@@ -58,14 +60,14 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     s3Bucket.grantRead(chunkUploadProcessingLambda); // For headObject
 
     // ================== API Gateway ==================
-    // Create API Gateway **without default `prod`**
+    // Create API Gateway without default `prod`
     const api = new apigateway.RestApi(this, `PlatePatrolAPI-${stage}`, {
       restApiName: `Plate Patrol Central Server API (${stage})`,
       description: `APIs for Plate Patrol Central Server - Stage: ${stage}`,
       deploy: false, // Do not create a default stage
     });
 
-    // Create a Deployment and Associate it with a Custom Stage (dev, staging, prod)
+    // Create a deployment and associate it with a custom stage (dev, staging, prod)
     const deployment = new apigateway.Deployment(
       this,
       `Deployment-${stage}-${Date.now()}`, // force a new deployment on each stack update
