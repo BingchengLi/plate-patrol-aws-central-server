@@ -39,6 +39,14 @@ export class Lambdas {
       })
     );
 
+    // Gramt Lambda permissions to write to upload status DynamoDB table
+    this.detectionsLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:PutItem"],
+        resources: [`arn:aws:dynamodb:*:*:table/${uploadStatusTable}`],
+      })
+    );
+
     // Grant Lambda permissions to generate pre-signed S3 URLs
     this.detectionsLambda.addToRolePolicy(
       new iam.PolicyStatement({

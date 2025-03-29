@@ -1,10 +1,14 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const { DynamoDBDocumentClient, GetCommand } = require("@aws-sdk/lib-dynamodb");
+const {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+} = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require("uuid");
 
 const client = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(client);
-const s3 = new S3Client({});
+// const s3 = new S3Client({});
 
 const WATCHLIST_TABLE = process.env.WATCHLIST_TABLE;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
@@ -96,7 +100,7 @@ exports.handler = async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         match: true,
-        imageId: imageId,
+        image_id: imageId,
       }),
     };
   } catch (error) {
