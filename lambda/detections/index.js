@@ -46,6 +46,7 @@ exports.handler = async (event) => {
     if (!Item) {
       return {
         statusCode: 200,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           match: false,
         }),
@@ -72,6 +73,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         match: true,
         upload_url: preSignedUrl, // Pre-signed URL for uploading match data
@@ -82,6 +84,7 @@ exports.handler = async (event) => {
     console.error("Error occurred:", error);
     return {
       statusCode: 500,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ error: "Internal Server Error" }),
     };
   }
