@@ -22,7 +22,6 @@ exports.handler = async (event) => {
     const { image_id, chunk_id, total_chunks, data, timestamp, gps_location } =
       JSON.parse(event.body);
 
-    // Chunk ID is 0-indexed so we're checking if it's defined
     if (!image_id || chunk_id === undefined || !total_chunks || !data) {
       return {
         statusCode: 400,
@@ -41,35 +40,65 @@ exports.handler = async (event) => {
       new PutObjectCommand({
         Bucket: UPLOADS_BUCKET,
         Key: chunkKey,
-        Body: Buffer.from(data, "base64"), // TODO: Check with Vicky if data is base64 encoded
+        Body: Buffer.from(data, "base64"), // Assuming data is Base64 encoded
       })
     );
 
-    console.log(
-      "Chunk stored successfully in S3 bucket:",
-      UPLOADS_BUCKET,
-      chunkKey
-    );
+    console.log("Chunk stored successfully in S3: ", chunkKey);
 
-    // Update DynamoDB metadata
+    // Update DynamoDB metadata in UPLOAD_STATUS_TABLE
+    // Primary key is image_id
+    // In DynamoDB, we will store the image_id, received_chunks (array of chunk_ids), total_chunks, and optionally timestamp and gps_location
+    // received_chunks will be a list of chunk_ids that have been received so far
+    // total_chunks will be the total number of chunks expected for this image_id
+    // timestamp and gps_location are optional fields - they should only be present in the first chunk
+    // Example DynamoDB record of an ongoing upload:
+    // {
+    //   "image_id": "abc123",
+    //   "received_chunks": [0, 1, 2],
+    //   "total_chunks": 5,
+    //   "timestamp": "2025-04-01T13:18:00Z",
+    //   "gps_location": "37.7749,-122.4194"
+    // }
+
+    const expressionAttributeValues = {
+      ":chunk": [chunk_id],
+      ":total_chunks": total_chunks,
+      ":empty_list": [],
+    };
+
+    // Add timestamp and gps_location to the update expression if they are provided
+    if (timestamp) {
+      expressionAttributeValues[":timestamp"] = timestamp;
+    }
+    if (gps_location) {
+      expressionAttributeValues[":gps_location"] = gps_location;
+    }
+
     const updateParams = {
       TableName: UPLOAD_STATUS_TABLE,
       Key: { image_id },
-      UpdateExpression:
-        "SET #received_chunks = list_append(if_not_exists(#received_chunks, :empty_list), :chunk), #total_chunks = :total_chunks, #timestamp = if_not_exists(#timestamp, :timestamp), #gps_location = if_not_exists(#gps_location, :gps_location)",
+      UpdateExpression: `
+        SET #received_chunks = list_append(if_not_exists(#received_chunks, :empty_list), :chunk),
+            #total_chunks = :total_chunks
+            ${
+              timestamp
+                ? ", #timestamp = if_not_exists(#timestamp, :timestamp)"
+                : ""
+            }
+            ${
+              gps_location
+                ? ", #gps_location = if_not_exists(#gps_location, :gps_location)"
+                : ""
+            }
+      `,
       ExpressionAttributeNames: {
         "#received_chunks": "received_chunks",
         "#total_chunks": "total_chunks",
-        "#timestamp": "timestamp",
-        "#gps_location": "gps_location",
+        ...(timestamp && { "#timestamp": "timestamp" }),
+        ...(gps_location && { "#gps_location": "gps_location" }),
       },
-      ExpressionAttributeValues: {
-        ":chunk": [chunk_id],
-        ":total_chunks": total_chunks,
-        ":timestamp": timestamp || new Date().toISOString(),
-        ":gps_location": gps_location || null,
-        ":empty_list": [],
-      },
+      ExpressionAttributeValues: expressionAttributeValues,
       ReturnValues: "ALL_NEW",
     };
 
@@ -98,9 +127,11 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         message: "Chunk uploaded successfully",
-        image_id,
         chunk_id,
       }),
     };
@@ -108,6 +139,7 @@ exports.handler = async (event) => {
     console.error("Error occurred:", error);
     return {
       statusCode: 500,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ error: "Internal Server Error" }),
     };
   }
