@@ -6,27 +6,32 @@ const {
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
+  GetCommand,
   UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
+// AWS SDK clients
 const s3 = new S3Client({});
 const dynamoDB = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
+// Environment variables
 const UPLOADS_BUCKET = process.env.UPLOADS_BUCKET;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
-const ASSEMBLED_FILES_PREFIX = "assembled/";
+const ASSEMBLED_FILES_PREFIX = "images/";
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
   try {
+    // Extract the image_id from the event payload
     const { image_id } = event;
 
+    // Validate the input
     if (!image_id) {
       throw new Error("Missing required field: image_id");
     }
 
-    // Fetch the metadata for the image_id from DynamoDB
+    // Fetch metadata for the image_id from DynamoDB
     console.log(`Fetching metadata for image_id: ${image_id}`);
     const getMetadataParams = {
       TableName: UPLOAD_STATUS_TABLE,
@@ -111,6 +116,7 @@ exports.handler = async (event) => {
 
     console.log(`Upload marked as complete for image_id: ${image_id}`);
 
+    // Return success response
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
@@ -121,6 +127,8 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error("Error occurred during assembly:", error);
+
+    // Return error response
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },

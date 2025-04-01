@@ -3,14 +3,15 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
   UpdateCommand,
-  GetCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
+// AWS SDK clients
 const s3 = new S3Client({});
 const dynamoDB = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const lambda = new LambdaClient({});
 
+// Environment variables
 const UPLOADS_BUCKET = process.env.UPLOADS_BUCKET;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
 const ASSEMBLY_LAMBDA = process.env.ASSEMBLY_LAMBDA;
@@ -19,9 +20,11 @@ exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
   try {
+    // Parse input data
     const { image_id, chunk_id, total_chunks, data, timestamp, gps_location } =
       JSON.parse(event.body);
 
+    // Validate required fields
     if (!image_id || chunk_id === undefined || !total_chunks || !data) {
       return {
         statusCode: 400,
@@ -32,7 +35,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // Store chunk in S3
+    // Store the chunk in S3
     const chunkKey = `uploads/${image_id}/chunk_${chunk_id}`;
     console.log("Storing chunk in S3:", chunkKey);
 
@@ -44,30 +47,24 @@ exports.handler = async (event) => {
       })
     );
 
-    console.log("Chunk stored successfully in S3: ", chunkKey);
+    console.log("Chunk stored successfully in S3:", chunkKey);
 
-    // Update DynamoDB metadata in UPLOAD_STATUS_TABLE
-    // Primary key is image_id
-    // In DynamoDB, we will store the image_id, received_chunks (array of chunk_ids), total_chunks, and optionally timestamp and gps_location
-    // received_chunks will be a list of chunk_ids that have been received so far
-    // total_chunks will be the total number of chunks expected for this image_id
-    // timestamp and gps_location are optional fields - they should only be present in the first chunk
-    // Example DynamoDB record of an ongoing upload:
-    // {
-    //   "image_id": "abc123",
-    //   "received_chunks": [0, 1, 2],
-    //   "total_chunks": 5,
-    //   "timestamp": "2025-04-01T13:18:00Z",
-    //   "gps_location": "37.7749,-122.4194"
-    // }
+    // UPLOAD_STATUS_TABLE
+    // Primary Key: image_id
+    // Attributes:
+    // - received_chunks (list of chunk_ids)
+    // - total_chunks (number)
+    // - timestamp (optional) * should be updated only once with the first chunk
+    // - gps_location (optional) * should be updated only once with the first chunk
 
+    // Update DynamoDB metadata
     const expressionAttributeValues = {
       ":chunk": [chunk_id],
       ":total_chunks": total_chunks,
       ":empty_list": [],
     };
 
-    // Add timestamp and gps_location to the update expression if they are provided
+    // Add timestamp and gps_location to the update expression if provided
     if (timestamp) {
       expressionAttributeValues[":timestamp"] = timestamp;
     }
@@ -115,7 +112,7 @@ exports.handler = async (event) => {
     if (uniqueChunks.length === total_chunks) {
       console.log("All chunks received. Triggering assembly process.");
 
-      // Invoke the assembly Lambda
+      // Invoke the assembly Lambda asynchronously
       await lambda.send(
         new InvokeCommand({
           FunctionName: ASSEMBLY_LAMBDA,
