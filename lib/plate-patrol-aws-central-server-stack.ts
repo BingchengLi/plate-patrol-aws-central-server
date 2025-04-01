@@ -54,6 +54,8 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     const detectionsLambda = lambdas.detectionsLambda;
     const watchlistManagementLambda = lambdas.watchlistManagementLambda;
     const chunkUploadProcessingLambda = lambdas.chunkUploadProcessingLambda;
+    // Assembly lambda is invoked by the chunk upload processing lambda
+    // Not directly exposed to API Gateway
 
     // Attach S3 Bucket Policy to allow read access
     s3Bucket.grantPut(chunkUploadProcessingLambda); // For uploads
