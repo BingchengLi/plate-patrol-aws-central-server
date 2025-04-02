@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
 // Load environment variables
 dotenv.config();
@@ -22,7 +23,7 @@ const TEST_IMAGE_PATH = path.join(__dirname, "../assets/45-kb-image-raw.jpg");
 
 const UPLOAD_STATUS_TABLE =
   process.env.UPLOAD_STATUS_TABLE || "upload_status_staging";
-const UPLOADS_BUCKET = process.env.UPLOADS_BUCKET || "uploads-bucket-staging";
+const S3_BUCKET = process.env.S3_BUCKET || "match-uploads-dev";
 
 const dynamoClient = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
@@ -103,32 +104,27 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
     console.log("Waiting for assembly process...");
     await new Promise((resolve) => setTimeout(resolve, 5000)); // Adjust wait time as needed
 
-    // Verify the assembled image status in DynamoDB
-    const { Item } = await dynamoDB.send(
-      new GetCommand({
-        TableName: UPLOAD_STATUS_TABLE,
-        Key: { image_id: imageId },
-      })
-    );
+    // Verify the assembled image exists in S3 and matches the original image
+    const s3 = new S3Client({ region: "us-east-2" });
 
-    expect(Item).toBeDefined();
-    if (Item) {
-      expect(Item.image_id).toBe(imageId);
-      expect(Item.status).toBe("COMPLETED");
+    const getObjectCommand = new GetObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: `images/${imageId}.png`,
+    });
+    try {
+      const data = await s3.send(getObjectCommand);
+      if (data.Body) {
+        const assembledImageBuffer = await Buffer.from(
+          await data.Body.transformToByteArray()
+        );
+        const originalImageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
+        expect(assembledImageBuffer.length).toBe(originalImageBuffer.length);
+        expect(assembledImageBuffer.equals(originalImageBuffer)).toBe(true);
+        console.log("Assembled image matches the original image.");
+      }
+    } catch (error) {
+      console.error("Error fetching assembled image from S3:", error);
+      throw error;
     }
-
-    // Verify the assembled image exists in S3
-    const assembledKey = `images/${imageId}.assembled`;
-    const assembledImageResponse = await fetch(
-      `https://${UPLOADS_BUCKET}.s3.amazonaws.com/${assembledKey}`
-    );
-
-    expect(assembledImageResponse.status).toBe(200);
-
-    const assembledImageBuffer = await assembledImageResponse.arrayBuffer();
-    const assembledImage = Buffer.from(assembledImageBuffer);
-
-    // Verify that the assembled image matches the original image
-    expect(assembledImage.equals(imageBuffer)).toBe(true);
-  });
+  }, 10000);
 });

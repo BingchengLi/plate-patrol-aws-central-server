@@ -194,6 +194,7 @@ export class Lambdas {
           S3_BUCKET: s3Bucket,
           MATCH_LOG_TABLE: matchLogTable,
           UPLOAD_STATUS_TABLE: uploadStatusTable,
+          ASSEMBLY_LAMBDA: this.assemblyLambda.functionName,
         },
       }
     );

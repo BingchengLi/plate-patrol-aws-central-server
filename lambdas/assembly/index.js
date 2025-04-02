@@ -15,7 +15,7 @@ const s3 = new S3Client({});
 const dynamoDB = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 // Environment variables
-const UPLOADS_BUCKET = process.env.UPLOADS_BUCKET;
+const UPLOADS_BUCKET = process.env.S3_BUCKET;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
 const ASSEMBLED_FILES_PREFIX = "images/";
 
@@ -83,7 +83,7 @@ exports.handler = async (event) => {
     );
 
     // Store the assembled file in S3
-    const assembledKey = `${ASSEMBLED_FILES_PREFIX}${image_id}.assembled`;
+    const assembledKey = `${ASSEMBLED_FILES_PREFIX}${image_id}.png`;
     console.log(`Storing assembled file in S3: ${assembledKey}`);
 
     await s3.send(
@@ -115,6 +115,13 @@ exports.handler = async (event) => {
     await dynamoDB.send(new UpdateCommand(updateParams));
 
     console.log(`Upload marked as complete for image_id: ${image_id}`);
+
+    // TODO: Log the match event in DynamoDB match log table
+
+    // Clean up
+    // TODO: Delete the chunks from S3 after assembly
+
+    // TODO: Delete the metadata from DynamoDB upload status table after assembly
 
     // Return success response
     return {

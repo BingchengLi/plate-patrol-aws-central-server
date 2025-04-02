@@ -12,7 +12,7 @@ const dynamoDB = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const lambda = new LambdaClient({});
 
 // Environment variables
-const UPLOADS_BUCKET = process.env.UPLOADS_BUCKET;
+const UPLOADS_BUCKET = process.env.S3_BUCKET;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
 const ASSEMBLY_LAMBDA = process.env.ASSEMBLY_LAMBDA;
 
