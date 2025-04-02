@@ -51,8 +51,7 @@ describe("/detections integration tests", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty("match", true);
-    expect(response.body).toHaveProperty("upload_url");
-    expect(response.body).toHaveProperty("file_key");
+    expect(response.body).toHaveProperty("image_id");
   });
 
   it("should return match: false for a plate not in the watchlist", async () => {

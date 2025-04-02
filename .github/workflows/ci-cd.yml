@@ -68,5 +68,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # Temporarily deploy to dev environment for PRs
+      # Staging is broken from a rollback issue
       - name: Deploy CDK Stack
-        run: cdk deploy --require-approval never --context stage=${{ github.event_name == 'pull_request' && 'staging' || 'prod' }}
+        run: cdk deploy --require-approval never --context stage=${{ github.event_name == 'pull_request' && 'dev' || 'prod' }}
