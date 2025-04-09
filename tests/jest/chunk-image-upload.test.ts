@@ -24,6 +24,7 @@ const TEST_IMAGE_PATH = path.join(__dirname, "../assets/45-kb-image-raw.jpg");
 const UPLOAD_STATUS_TABLE =
   process.env.UPLOAD_STATUS_TABLE || "upload_status_staging";
 const S3_BUCKET = process.env.S3_BUCKET || "match-uploads-dev";
+const MATCH_LOG_TABLE = process.env.MATCH_LOG_TABLE || "match_logs_dev";
 
 const dynamoClient = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
@@ -83,21 +84,40 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
     const totalChunks = chunks.length;
 
     // Step 5: Upload each chunk via the /uploads API
-    for (let i = 0; i < chunks.length; i++) {
-      const response = await request(API_URL)
-        .post("/uploads")
-        .send({
-          image_id: imageId,
-          chunk_id: i,
-          total_chunks: totalChunks,
-          data: chunks[i].toString("base64"), // Encode chunk as Base64
-        });
+    // Upload gps and timestamp for the first chunk
+    const gps = "37.7749,-122.4194";
+    const timestamp = new Date().toISOString();
+    const initialResponse = await request(API_URL).post("/uploads").send({
+      image_id: imageId,
+      chunk_id: 0,
+      total_chunks: totalChunks,
+      gps_location: gps,
+      timestamp,
+    });
+    expect(initialResponse.statusCode).toBe(200);
+    expect(initialResponse.body).toEqual({
+      message: "Chunk uploaded successfully",
+      chunk_id: 0,
+    });
 
-      expect(response.statusCode).toBe(200);
-      expect(response.body).toEqual({
-        message: "Chunk uploaded successfully",
-        chunk_id: i,
-      });
+    // Upload the rest of the chunks
+    if (chunks.length > 1) {
+      for (let i = 1; i < chunks.length; i++) {
+        const response = await request(API_URL)
+          .post("/uploads")
+          .send({
+            image_id: imageId,
+            chunk_id: i,
+            total_chunks: totalChunks,
+            data: chunks[i].toString("base64"), // Encode chunk as Base64
+          });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toEqual({
+          message: "Chunk uploaded successfully",
+          chunk_id: i,
+        });
+      }
     }
 
     // Wait for the assembly Lambda to process the chunks
@@ -126,5 +146,11 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
       console.error("Error fetching assembled image from S3:", error);
       throw error;
     }
+
+    // Verify the match log in DynamoDB
+    const getCommand = new GetCommand({
+      TableName: MATCH_LOG_TABLE,
+      Key: { match_id: imageId },
+    });
   }, 10000);
 });
