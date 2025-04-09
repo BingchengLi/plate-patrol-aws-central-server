@@ -7,6 +7,7 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
   GetCommand,
+  PutCommand,
   UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
@@ -132,12 +133,12 @@ exports.handler = async (event) => {
         plate_number,
         timestamp,
         gps_location,
-        image_url: imageUrl,
+        assembled_file: assembledKey,
         created_at: new Date().toISOString(), // For latency tracking
       },
     };
 
-    await dynamoDB.send(new UpdateCommand(matchLogParams));
+    await dynamoDB.send(new PutCommand(matchLogParams));
 
     console.log(`Match event logged for image_id: ${image_id}`);
 
