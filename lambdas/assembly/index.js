@@ -133,7 +133,7 @@ exports.handler = async (event) => {
         timestamp,
         gps_location,
         image_url: imageUrl,
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString(), // For latency tracking
       },
     };
 

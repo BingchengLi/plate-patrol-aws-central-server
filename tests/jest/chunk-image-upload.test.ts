@@ -87,13 +87,16 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
     // Upload gps and timestamp for the first chunk
     const gps = "37.7749,-122.4194";
     const timestamp = new Date().toISOString();
-    const initialResponse = await request(API_URL).post("/uploads").send({
-      image_id: imageId,
-      chunk_id: 0,
-      total_chunks: totalChunks,
-      gps_location: gps,
-      timestamp,
-    });
+    const initialResponse = await request(API_URL)
+      .post("/uploads")
+      .send({
+        image_id: imageId,
+        chunk_id: 0,
+        total_chunks: totalChunks,
+        data: chunks[0].toString("base64"), // Encode chunk as Base64
+        gps_location: gps,
+        timestamp: timestamp,
+      });
     expect(initialResponse.statusCode).toBe(200);
     expect(initialResponse.body).toEqual({
       message: "Chunk uploaded successfully",
@@ -150,7 +153,7 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
     // Verify the match log in DynamoDB
     const getCommand = new GetCommand({
       TableName: MATCH_LOG_TABLE,
-      Key: { match_id: imageId },
+      Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
     });
   }, 10000);
 });
