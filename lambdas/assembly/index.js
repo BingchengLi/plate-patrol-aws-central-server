@@ -7,6 +7,7 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
   GetCommand,
+  PutCommand,
   UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
@@ -18,6 +19,7 @@ const dynamoDB = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const UPLOADS_BUCKET = process.env.S3_BUCKET;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
 const ASSEMBLED_FILES_PREFIX = "images/";
+const MATCH_LOG_TABLE = process.env.MATCH_LOG_TABLE;
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
@@ -43,7 +45,13 @@ exports.handler = async (event) => {
       throw new Error(`No metadata found for image_id: ${image_id}`);
     }
 
-    const { received_chunks, total_chunks } = metadata.Item;
+    const {
+      received_chunks,
+      total_chunks,
+      timestamp,
+      gps_location,
+      plate_number,
+    } = metadata.Item;
 
     // Validate that all chunks are present
     const uniqueChunks = Array.from(new Set(received_chunks)); // Deduplicate chunks
@@ -116,7 +124,23 @@ exports.handler = async (event) => {
 
     console.log(`Upload marked as complete for image_id: ${image_id}`);
 
-    // TODO: Log the match event in DynamoDB match log table
+    // Log the match event in DynamoDB match log table
+    console.log(`Logging match event for image_id: ${image_id}`);
+    const matchLogParams = {
+      TableName: MATCH_LOG_TABLE,
+      Item: {
+        match_id: image_id,
+        plate_number,
+        timestamp,
+        gps_location,
+        assembled_file: assembledKey,
+        created_at: new Date().toISOString(), // For latency tracking
+      },
+    };
+
+    await dynamoDB.send(new PutCommand(matchLogParams));
+
+    console.log(`Match event logged for image_id: ${image_id}`);
 
     // Clean up
     // TODO: Delete the chunks from S3 after assembly
