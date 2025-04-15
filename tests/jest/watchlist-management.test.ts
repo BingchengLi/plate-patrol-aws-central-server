@@ -19,9 +19,9 @@ const TEST_REASON = "Suspicious vehicle";
 describe("/plates integration tests", () => {
   afterAll(async () => {
     // Clean up the test plate from the watchlist
-    const response = await request(API_URL).delete(
-      `/plates/${TEST_PLATE_NUMBER}`
-    );
+    const response = await request(API_URL)
+      .delete(`/plates/${TEST_PLATE_NUMBER}`)
+      .set("x-api-key", VALID_API_KEY);
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ message: "Plate removed from watchlist" });
     console.log("Test plate deleted from the watchlist");
