@@ -10,8 +10,11 @@ const API_BASE_URL =
 const STAGE = process.env.STAGE || "dev";
 const API_URL = `${API_BASE_URL}/${STAGE}`;
 
-const VALID_API_KEY =
+const VALID_WATCHLIST_API_KEY =
   process.env.VALID_API_KEY || "RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs";
+const VALID_DASHCAM_API_KEY =
+  process.env.VALID_DASHCAM_API_KEY ||
+  "pXceWVib2h1ej16WgIaWs2JQzLk6RXUJ8mGylFFo";
 const INVALID_API_KEY = "invalid-api-key";
 const TEST_PLATE_NUMBER = "ABC123";
 const TEST_REASON = "Suspicious vehicle";
@@ -24,7 +27,7 @@ describe("/detections integration tests", () => {
     console.log("Adding test plate to watchlist...");
     const response = await request(API_URL)
       .post("/plates")
-      .set("x-api-key", VALID_API_KEY)
+      .set("x-api-key", VALID_WATCHLIST_API_KEY)
       .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
 
     expect(response.statusCode).toBe(200);
@@ -36,7 +39,7 @@ describe("/detections integration tests", () => {
     console.log("Removing test plate from watchlist...");
     const response = await request(API_URL)
       .delete(`/plates/${TEST_PLATE_NUMBER}`)
-      .set("x-api-key", VALID_API_KEY);
+      .set("x-api-key", VALID_WATCHLIST_API_KEY);
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ message: "Plate removed from watchlist" });
@@ -45,9 +48,9 @@ describe("/detections integration tests", () => {
 
   // ============== Test Plate Detection ==============
   it("should return match: true for a plate in the watchlist", async () => {
-    const response = await request(API_URL).get(
-      `/detections/${TEST_PLATE_NUMBER}`
-    );
+    const response = await request(API_URL)
+      .get(`/detections/${TEST_PLATE_NUMBER}`)
+      .set("x-api-key", VALID_DASHCAM_API_KEY);
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toHaveProperty("match", true);
@@ -55,10 +58,27 @@ describe("/detections integration tests", () => {
   });
 
   it("should return match: false for a plate not in the watchlist", async () => {
-    const response = await request(API_URL).get(`/detections/NOT_IN_LIST`);
+    const response = await request(API_URL)
+      .get(`/detections/INVALID_PLATE`)
+      .set("x-api-key", VALID_DASHCAM_API_KEY);
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ match: false });
+  });
+
+  it("should return 403 Forbidden for invalid API key", async () => {
+    const response = await request(API_URL)
+      .get(`/detections/${TEST_PLATE_NUMBER}`)
+      .set("x-api-key", INVALID_API_KEY);
+
+    expect(response.statusCode).toBe(403); // 403 Forbidden
+  });
+
+  it("should return 403 Forbidden for missing API key", async () => {
+    const response = await request(API_URL).get(
+      `/detections/${TEST_PLATE_NUMBER}`
+    );
+    expect(response.statusCode).toBe(403); // 403 Forbidden
   });
 
   // ============== Test Missing Plate Number ==============
