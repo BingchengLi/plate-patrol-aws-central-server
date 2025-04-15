@@ -84,6 +84,9 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
 
     api.deploymentStage = stageDeployment;
 
+    // ==================== API Key ==================
+    // Congiured manually in AWS Console for better security
+
     // ================== Resources ==================
     // ----------------- /detections -------------------
     const detectionsResource = api.root.addResource("detections");
@@ -91,17 +94,23 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     // GET /detections/{plate_number} - should call the Lambda function
     detectionsResource
       .addResource("{plate_number}")
-      .addMethod("GET", new apigateway.LambdaIntegration(detectionsLambda));
+      .addMethod("GET", new apigateway.LambdaIntegration(detectionsLambda), {
+        apiKeyRequired: true, // Require API Key
+      });
 
     // ================== /plates API ==================
+    // All endpoints under /plates are for watchlist management
+    // Note: The API Key is required for all endpoints under /plates
     const platesResource = api.root.addResource("plates");
 
     // GET /plates - Get the list of plates in the watchlist
     // Internal use only
-    // TODO: Improve this to require an dev IAM role
     platesResource.addMethod(
       "GET",
-      new apigateway.LambdaIntegration(watchlistManagementLambda)
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true, // Require API Key for GET
+      }
     );
 
     // PUT /plates - Public API to add a plate to the watchlist
@@ -109,16 +118,19 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       "POST",
       new apigateway.LambdaIntegration(watchlistManagementLambda),
       {
-        apiKeyRequired: true, // Require API Key for PUT
+        apiKeyRequired: true, // Require API Key for POST
       }
     );
 
-    // DELETE /plates - Internal use only
+    // DELETE /plates/{plate_number} - Public API to remove a plate from the watchlist
     platesResource
       .addResource("{plate_number}")
       .addMethod(
         "DELETE",
-        new apigateway.LambdaIntegration(watchlistManagementLambda)
+        new apigateway.LambdaIntegration(watchlistManagementLambda),
+        {
+          apiKeyRequired: true, // Require API Key for DELETE
+        }
       );
 
     // ================== /uploads API ==================
@@ -127,7 +139,10 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
     // POST /uploads - Endpoint for chunked image uploads
     uploadsResource.addMethod(
       "POST",
-      new apigateway.LambdaIntegration(chunkUploadProcessingLambda)
+      new apigateway.LambdaIntegration(chunkUploadProcessingLambda),
+      {
+        apiKeyRequired: true,
+      }
     );
 
     // ================== S3 Trigger ==================
