@@ -177,6 +177,18 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
       TableName: MATCH_LOG_TABLE,
       Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
     });
+
+    const response = await dynamoDB.send(getCommand);
+    expect(response.Item).toBeDefined();
+    expect(response.Item).toHaveProperty("match_id", imageId);
+    expect(response.Item).toHaveProperty("plate_number", TEST_PLATE_NUMBER);
+    expect(response.Item).toHaveProperty("gps_location", gps);
+    expect(response.Item).toHaveProperty("timestamp", timestamp);
+    expect(response.Item).toHaveProperty(
+      "assembled_file",
+      `images/${imageId}.png`
+    );
+    expect(response.Item).toHaveProperty("created_at");
   }, 10000);
 });
 
@@ -224,6 +236,38 @@ describe("Chunk image upload edge case tests", () => {
   });
 
   describe("Chunk validation", () => {
+    it("should return 400 error for missing image_id", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", VALID_DASHCAM_API_KEY)
+        .send({
+          chunk_id: 0,
+          total_chunks: 1,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        error:
+          "Missing required fields: image_id, chunk_id, total_chunks, or data",
+      });
+    });
+
+    it("should return 400 error for missing chunk_id", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", VALID_DASHCAM_API_KEY)
+        .send({
+          image_id: imageId,
+          total_chunks: 1,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        error:
+          "Missing required fields: image_id, chunk_id, total_chunks, or data",
+      });
+    });
+
     it("should return 400 for invalid image_id", async () => {
       const response = await request(API_URL)
         .post("/uploads")
@@ -271,5 +315,139 @@ describe("Chunk image upload edge case tests", () => {
         error: "total_chunks must be a positive number",
       });
     });
+  });
+
+  describe("Chunk upload with duplicate chunks", () => {
+    it("should successfully upload the full image", async () => {
+      const imageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
+
+      const chunkSize = 8 * 1024; // 8KB
+      const chunks = [];
+      for (let i = 0; i < imageBuffer.length; i += chunkSize) {
+        chunks.push(imageBuffer.slice(i, i + chunkSize));
+      }
+
+      const totalChunks = chunks.length;
+
+      // Upload gps and timestamp for the first chunk
+      const gps = "37.7749,-122.4194";
+      const timestamp = new Date().toISOString();
+      const initialResponse = await request(API_URL)
+        .post("/uploads")
+        .send({
+          image_id: imageId,
+          chunk_id: 0,
+          total_chunks: totalChunks,
+          data: chunks[0].toString("base64"), // Encode chunk as Base64
+          gps_location: gps,
+          timestamp: timestamp,
+        })
+        .set("x-api-key", VALID_DASHCAM_API_KEY);
+      expect(initialResponse.statusCode).toBe(200);
+      expect(initialResponse.body).toEqual({
+        message: "Chunk uploaded successfully",
+        chunk_id: 0,
+      });
+
+      // Upload the rest of the chunks
+      if (chunks.length > 1) {
+        for (let i = 1; i < chunks.length; i++) {
+          const response = await request(API_URL)
+            .post("/uploads")
+            .send({
+              image_id: imageId,
+              chunk_id: i,
+              total_chunks: totalChunks,
+              data: chunks[i].toString("base64"), // Encode chunk as Base64
+            })
+            .set("x-api-key", VALID_DASHCAM_API_KEY);
+
+          expect(response.statusCode).toBe(200);
+          expect(response.body).toEqual({
+            message: "Chunk uploaded successfully",
+            chunk_id: i,
+          });
+        }
+      }
+
+      // Upload the first chunk again
+      const duplicateResponse = await request(API_URL)
+        .post("/uploads")
+        .send({
+          image_id: imageId,
+          chunk_id: 0,
+          total_chunks: totalChunks,
+          data: chunks[0].toString("base64"), // Encode chunk as Base64
+        })
+        .set("x-api-key", VALID_DASHCAM_API_KEY);
+      expect(duplicateResponse.statusCode).toBe(200);
+      expect(duplicateResponse.body).toEqual({
+        message: "Chunk uploaded successfully",
+        chunk_id: 0,
+      });
+      console.log("Duplicate chunk uploaded successfully.");
+
+      // Upload the last chunk again
+      const lastChunkResponse = await request(API_URL)
+        .post("/uploads")
+        .send({
+          image_id: imageId,
+          chunk_id: totalChunks - 1,
+          total_chunks: totalChunks,
+          data: chunks[totalChunks - 1].toString("base64"), // Encode chunk as Base64
+        })
+        .set("x-api-key", VALID_DASHCAM_API_KEY);
+      expect(lastChunkResponse.statusCode).toBe(200);
+      expect(lastChunkResponse.body).toEqual({
+        message: "Chunk uploaded successfully",
+        chunk_id: totalChunks - 1,
+      });
+      console.log("Last chunk uploaded successfully.");
+
+      // Wait for the assembly Lambda to process the chunks
+      console.log("Waiting for assembly process...");
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // Adjust wait time as needed
+
+      // Verify the assembled image exists in S3 and matches the original image
+      const s3 = new S3Client({ region: "us-east-2" });
+
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: `images/${imageId}.png`,
+      });
+      try {
+        const data = await s3.send(getObjectCommand);
+        if (data.Body) {
+          const assembledImageBuffer = await Buffer.from(
+            await data.Body.transformToByteArray()
+          );
+          const originalImageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
+          expect(assembledImageBuffer.length).toBe(originalImageBuffer.length);
+          expect(assembledImageBuffer.equals(originalImageBuffer)).toBe(true);
+          console.log("Assembled image matches the original image.");
+        }
+      } catch (error) {
+        console.error("Error fetching assembled image from S3:", error);
+        throw error;
+      }
+
+      // Verify the match log in DynamoDB
+      const getCommand = new GetCommand({
+        TableName: MATCH_LOG_TABLE,
+        Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
+      });
+
+      const response = await dynamoDB.send(getCommand);
+      expect(response.Item).toBeDefined();
+      expect(response.Item).toHaveProperty("match_id", imageId);
+      expect(response.Item).toHaveProperty("plate_number", TEST_PLATE_NUMBER);
+      expect(response.Item).toHaveProperty("gps_location", gps);
+      expect(response.Item).toHaveProperty("timestamp", timestamp);
+      expect(response.Item).toHaveProperty(
+        "assembled_file",
+        `images/${imageId}.png`
+      );
+      expect(response.Item).toHaveProperty("created_at");
+    }, 10000);
   });
 });
