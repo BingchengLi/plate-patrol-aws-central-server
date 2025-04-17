@@ -2,6 +2,7 @@ const {
   S3Client,
   GetObjectCommand,
   PutObjectCommand,
+  DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
@@ -9,6 +10,7 @@ const {
   GetCommand,
   PutCommand,
   UpdateCommand,
+  DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
 // AWS SDK clients
@@ -142,10 +144,22 @@ exports.handler = async (event) => {
 
     console.log(`Match event logged for image_id: ${image_id}`);
 
-    // Clean up
-    // TODO: Delete the chunks from S3 after assembly
+    // Cleanup: Delete chunks from S3
+    await Promise.all(
+      sortedChunks.map(async (chunk_id) => {
+        const chunkKey = `uploads/${image_id}/chunk_${chunk_id}`;
+        console.log(`Deleting chunk from S3: ${chunkKey}`);
+        await s3.send(
+          new DeleteObjectCommand({ Bucket: UPLOADS_BUCKET, Key: chunkKey })
+        );
+      })
+    );
 
-    // TODO: Delete the metadata from DynamoDB upload status table after assembly
+    // Cleanup: Delete metadata from DynamoDB UPLOAD_STATUS_TABLE
+    console.log(`Deleting metadata from DynamoDB for image_id: ${image_id}`);
+    await dynamoDB.send(
+      new DeleteCommand({ TableName: UPLOAD_STATUS_TABLE, Key: { image_id } })
+    );
 
     // Return success response
     return {
