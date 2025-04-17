@@ -16,7 +16,7 @@ const VALID_DASHCAM_API_KEY =
   process.env.VALID_DASHCAM_API_KEY ||
   "pXceWVib2h1ej16WgIaWs2JQzLk6RXUJ8mGylFFo";
 const INVALID_API_KEY = "invalid-api-key";
-const TEST_PLATE_NUMBER = "ABC123";
+const TEST_PLATE_NUMBER = "ABC456";
 const TEST_REASON = "Suspicious vehicle";
 
 // Temporarily skip detection tests in CI

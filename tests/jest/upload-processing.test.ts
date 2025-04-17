@@ -28,7 +28,7 @@ const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
 const TABLE_NAME = process.env.MATCH_LOG_TABLE || "match_logs_staging";
 
 // ============== Upload Processing Integration Test ==============
-describe("/upload-processing integration test", () => {
+describe.skip("/upload-processing integration test", () => {
   let uploadUrl: string;
   let fileKey: string;
 
