@@ -36,22 +36,22 @@ exports.handler = async (event) => {
       };
     }
 
-    // Validate chunk_id - it should be a number that is smaller than total_chunks
-    if (isNaN(chunk_id) || chunk_id < 0 || chunk_id >= total_chunks) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          error: "chunk_id must be a number between 0 and total_chunks - 1",
-        }),
-      };
-    }
-
     // Validate total_chunks - it should be a positive number
     if (isNaN(total_chunks) || total_chunks <= 0) {
       return {
         statusCode: 400,
         body: JSON.stringify({
           error: "total_chunks must be a positive number",
+        }),
+      };
+    }
+
+    // Validate chunk_id - it should be a number that is smaller than total_chunks
+    if (isNaN(chunk_id) || chunk_id < 0 || chunk_id >= total_chunks) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: "chunk_id must be a number between 0 and total_chunks - 1",
         }),
       };
     }
