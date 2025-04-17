@@ -5,6 +5,7 @@ import path from "path";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { error } from "console";
 
 // Load environment variables
 dotenv.config();
@@ -33,71 +34,60 @@ const MATCH_LOG_TABLE = process.env.MATCH_LOG_TABLE || "match_logs_dev";
 const dynamoClient = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(dynamoClient);
 
+const addTestPlateToWatchlist = async () => {
+  console.log("Adding test plate to watchlist...");
+  const response = await request(API_URL)
+    .post("/plates")
+    .set("x-api-key", VALID_WATCHLIST_API_KEY)
+    .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
+
+  expect(response.statusCode).toBe(200);
+  console.log("Test plate added.");
+};
+
+const removeTestPlateFromWatchlist = async () => {
+  console.log("Removing test plate from watchlist...");
+  const response = await request(API_URL)
+    .delete(`/plates/${TEST_PLATE_NUMBER}`)
+    .set("x-api-key", VALID_WATCHLIST_API_KEY);
+
+  expect(response.statusCode).toBe(200);
+  expect(response.body).toEqual({ message: "Plate removed from watchlist" });
+  console.log("Test plate deleted.");
+};
+
+const getImageIdFromDetection = async () => {
+  console.log("Retrieving image_id via detection API...");
+  const response = await request(API_URL)
+    .get(`/detections/${TEST_PLATE_NUMBER}`)
+    .set("x-api-key", VALID_DASHCAM_API_KEY);
+
+  expect(response.statusCode).toBe(200);
+  expect(response.body).toHaveProperty("match", true);
+  expect(response.body).toHaveProperty("image_id");
+
+  const imageId = response.body.image_id;
+  console.log(`Retrieved image_id: ${imageId}`);
+
+  return imageId;
+};
+
 describe("Full Detection + Chunked Image Upload Integration Test", () => {
   let imageId: string;
 
   beforeAll(async () => {
     // Step 1: Add the test plate to the watchlist
-    console.log("Adding test plate to watchlist...");
-    const response = await request(API_URL)
-      .post("/plates")
-      .set("x-api-key", VALID_WATCHLIST_API_KEY)
-      .send({ plate_number: TEST_PLATE_NUMBER, reason: TEST_REASON });
-
-    expect(response.statusCode).toBe(200);
-    console.log("Test plate added.");
+    await addTestPlateToWatchlist();
   });
 
   afterAll(async () => {
     // Step 6: Clean up the test plate from the watchlist
-    console.log("Removing test plate from watchlist...");
-    const response = await request(API_URL)
-      .delete(`/plates/${TEST_PLATE_NUMBER}`)
-      .set("x-api-key", VALID_WATCHLIST_API_KEY);
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toEqual({ message: "Plate removed from watchlist" });
-    console.log("Test plate deleted.");
+    await removeTestPlateFromWatchlist();
   });
 
   it("should retrieve an image_id via detection API", async () => {
     // Step 2: Perform detection to get the image_id
-    const response = await request(API_URL)
-      .get(`/detections/${TEST_PLATE_NUMBER}`)
-      .set("x-api-key", VALID_DASHCAM_API_KEY);
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toHaveProperty("match", true);
-    expect(response.body).toHaveProperty("image_id");
-
-    imageId = response.body.image_id;
-    console.log(`Retrieved image_id: ${imageId}`);
-  });
-
-  it("should not be able to upload without api key", async () => {
-    const response = await request(API_URL).post("/uploads").send({
-      image_id: imageId,
-      chunk_id: 0,
-      total_chunks: 1,
-      data: "test",
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toEqual({ message: "Forbidden" });
-  });
-
-  it("should not be able to upload with invalid api key", async () => {
-    const response = await request(API_URL)
-      .post("/uploads")
-      .set("x-api-key", "INVALID_API_KEY")
-      .send({
-        image_id: imageId,
-        chunk_id: 0,
-        total_chunks: 1,
-        data: "test",
-      });
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toEqual({ message: "Forbidden" });
+    imageId = await getImageIdFromDetection();
   });
 
   it("should upload chunks and verify the assembled image", async () => {
@@ -188,4 +178,98 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
       Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
     });
   }, 10000);
+});
+
+describe("Chunk image upload edge case tests", () => {
+  let imageId: string;
+  const invalidChunkId = -1;
+  const invalidTotalChunks = -1;
+  const invalidImageId = "INVALID_IMAGE_ID";
+
+  beforeAll(async () => {
+    await addTestPlateToWatchlist();
+    imageId = await getImageIdFromDetection();
+  });
+
+  afterAll(async () => {
+    await removeTestPlateFromWatchlist();
+  });
+
+  describe("API key validation", () => {
+    it("should not be able to upload without api key", async () => {
+      const response = await request(API_URL).post("/uploads").send({
+        image_id: imageId,
+        chunk_id: 0,
+        total_chunks: 1,
+        data: "test",
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.body).toEqual({ message: "Forbidden" });
+    });
+
+    it("should not be able to upload with invalid api key", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", "INVALID_API_KEY")
+        .send({
+          image_id: imageId,
+          chunk_id: 0,
+          total_chunks: 1,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(403);
+      expect(response.body).toEqual({ message: "Forbidden" });
+    });
+  });
+
+  describe("Chunk validation", () => {
+    it("should return 400 for invalid image_id", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", VALID_DASHCAM_API_KEY)
+        .send({
+          image_id: invalidImageId,
+          chunk_id: 0,
+          total_chunks: 1,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        error: "image_id is not valid",
+      });
+    });
+
+    it("should return 400 for invalid chunk_id", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", VALID_DASHCAM_API_KEY)
+        .send({
+          image_id: imageId,
+          chunk_id: invalidChunkId,
+          total_chunks: 1,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        error: "chunk_id must be a number between 0 and total_chunks - 1",
+      });
+    });
+
+    it("should return 400 for invalid total_chunks", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", VALID_DASHCAM_API_KEY)
+        .send({
+          image_id: imageId,
+          chunk_id: 0,
+          total_chunks: invalidTotalChunks,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        error: "total_chunks must be a positive number",
+      });
+    });
+  });
 });
