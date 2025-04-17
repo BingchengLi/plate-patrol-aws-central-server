@@ -150,7 +150,7 @@ const getImageIdFromDetection = async () => {
   return imageId;
 };
 
-describe.only("Full Detection + Chunked Image Upload Integration Test", () => {
+describe("Full Detection + Chunked Image Upload Integration Test", () => {
   let imageId: string;
 
   beforeAll(async () => {
@@ -442,14 +442,5 @@ describe("Chunk image upload edge case tests", () => {
         error: "image_id is not valid",
       });
     });
-  });
-
-  describe("Chunk upload with out-of-order chunks", () => {
-    beforeAll(async () => {
-      // Get a new image_id for the test
-      imageId = await getImageIdFromDetection();
-    });
-
-    it("should upload chunks out of order", async () => {});
   });
 });
