@@ -3,6 +3,7 @@ const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
   DynamoDBDocumentClient,
   UpdateCommand,
+  GetCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 
@@ -24,7 +25,7 @@ exports.handler = async (event) => {
     const { image_id, chunk_id, total_chunks, data, timestamp, gps_location } =
       JSON.parse(event.body);
 
-    // Validate required fields
+    // Check for required fields
     if (!image_id || chunk_id === undefined || !total_chunks || !data) {
       return {
         statusCode: 400,
@@ -34,6 +35,42 @@ exports.handler = async (event) => {
         }),
       };
     }
+
+    // Validate chunk_id - it should be a number that is smaller than total_chunks
+    if (isNaN(chunk_id) || chunk_id < 0 || chunk_id >= total_chunks) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: "chunk_id must be a number between 0 and total_chunks - 1",
+        }),
+      };
+    }
+
+    // Validate total_chunks - it should be a positive number
+    if (isNaN(total_chunks) || total_chunks <= 0) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: "total_chunks must be a positive number",
+        }),
+      };
+    }
+
+    // Validate image_id - there should be a record in UPLOAD_STATUS_TABLE
+    const getImageIdParams = {
+      TableName: UPLOAD_STATUS_TABLE,
+      Key: { image_id },
+    };
+
+    const imageIdRecord = await dynamoDB.send(new GetCommand(getImageIdParams));
+    if (!imageIdRecord.Item) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "image_id is not valid" }),
+      };
+    }
+
+    console.log("Valid image_id found in DynamoDB:", imageIdRecord.Item);
 
     // Store the chunk in S3
     const chunkKey = `uploads/${image_id}/chunk_${chunk_id}`;
