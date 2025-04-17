@@ -189,6 +189,34 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
       `images/${imageId}.png`
     );
     expect(response.Item).toHaveProperty("created_at");
+
+    // Verify cleanup of chunks in S3
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkKey = `uploads/${imageId}/chunk_${i}`;
+      try {
+        await s3.send(
+          new GetObjectCommand({ Bucket: S3_BUCKET, Key: chunkKey })
+        );
+        throw new Error(`Chunk ${chunkKey} was not deleted as expected.`);
+      } catch (error) {
+        if (error instanceof Error) {
+          expect(error.name).toBe("NoSuchKey");
+          console.log(`Chunk ${chunkKey} successfully deleted.`);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    // Verify cleanup of metadata in DynamoDB
+    const metadataCheckCommand = new GetCommand({
+      TableName: UPLOAD_STATUS_TABLE,
+      Key: { image_id: imageId },
+    });
+
+    const metadataResponse = await dynamoDB.send(metadataCheckCommand);
+    expect(metadataResponse.Item).toBeUndefined();
+    console.log(`Metadata for image_id ${imageId} successfully deleted.`);
   }, 10000);
 });
 
@@ -449,5 +477,21 @@ describe("Chunk image upload edge case tests", () => {
       );
       expect(response.Item).toHaveProperty("created_at");
     }, 10000);
+
+    it("should return error if we try to upload with the same image_id since we already uploaded the image", async () => {
+      const response = await request(API_URL)
+        .post("/uploads")
+        .set("x-api-key", VALID_DASHCAM_API_KEY)
+        .send({
+          image_id: imageId,
+          chunk_id: 0,
+          total_chunks: 1,
+          data: "test",
+        });
+      expect(response.statusCode).toBe(400);
+      expect(response.body).toEqual({
+        error: "image_id is invalid",
+      });
+    });
   });
 });
