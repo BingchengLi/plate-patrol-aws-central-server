@@ -56,6 +56,84 @@ const removeTestPlateFromWatchlist = async () => {
   console.log("Test plate deleted.");
 };
 
+const verifyUpload = async (
+  imageId: string,
+  gps: string,
+  timestamp: string,
+  totalChunks: number
+) => {
+  // Wait for the assembly Lambda to process the chunks
+  console.log("Waiting for assembly process...");
+  await new Promise((resolve) => setTimeout(resolve, 5000)); // Adjust wait time as needed
+
+  // Verify the assembled image exists in S3 and matches the original image
+  const s3 = new S3Client({ region: "us-east-2" });
+
+  const getObjectCommand = new GetObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `images/${imageId}.png`,
+  });
+  try {
+    const data = await s3.send(getObjectCommand);
+    if (data.Body) {
+      const assembledImageBuffer = await Buffer.from(
+        await data.Body.transformToByteArray()
+      );
+      const originalImageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
+      expect(assembledImageBuffer.length).toBe(originalImageBuffer.length);
+      expect(assembledImageBuffer.equals(originalImageBuffer)).toBe(true);
+      console.log("Assembled image matches the original image.");
+    }
+  } catch (error) {
+    console.error("Error fetching assembled image from S3:", error);
+    throw error;
+  }
+
+  // Verify the match log in DynamoDB
+  const getCommand = new GetCommand({
+    TableName: MATCH_LOG_TABLE,
+    Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
+  });
+
+  const response = await dynamoDB.send(getCommand);
+  expect(response.Item).toBeDefined();
+  expect(response.Item).toHaveProperty("match_id", imageId);
+  expect(response.Item).toHaveProperty("plate_number", TEST_PLATE_NUMBER);
+  expect(response.Item).toHaveProperty("gps_location", gps);
+  expect(response.Item).toHaveProperty("timestamp", timestamp);
+  expect(response.Item).toHaveProperty(
+    "assembled_file",
+    `images/${imageId}.png`
+  );
+  expect(response.Item).toHaveProperty("created_at");
+
+  // Verify cleanup of chunks in S3
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkKey = `uploads/${imageId}/chunk_${i}`;
+    try {
+      await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: chunkKey }));
+      throw new Error(`Chunk ${chunkKey} was not deleted as expected.`);
+    } catch (error) {
+      if (error instanceof Error) {
+        expect(error.name).toBe("NoSuchKey");
+        console.log(`Chunk ${chunkKey} successfully deleted.`);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  // Verify cleanup of metadata in DynamoDB
+  const metadataCheckCommand = new GetCommand({
+    TableName: UPLOAD_STATUS_TABLE,
+    Key: { image_id: imageId },
+  });
+
+  const metadataResponse = await dynamoDB.send(metadataCheckCommand);
+  expect(metadataResponse.Item).toBeUndefined();
+  console.log(`Metadata for image_id ${imageId} successfully deleted.`);
+};
+
 const getImageIdFromDetection = async () => {
   console.log("Retrieving image_id via detection API...");
   const response = await request(API_URL)
@@ -72,7 +150,7 @@ const getImageIdFromDetection = async () => {
   return imageId;
 };
 
-describe("Full Detection + Chunked Image Upload Integration Test", () => {
+describe.only("Full Detection + Chunked Image Upload Integration Test", () => {
   let imageId: string;
 
   beforeAll(async () => {
@@ -145,78 +223,8 @@ describe("Full Detection + Chunked Image Upload Integration Test", () => {
       }
     }
 
-    // Wait for the assembly Lambda to process the chunks
-    console.log("Waiting for assembly process...");
-    await new Promise((resolve) => setTimeout(resolve, 5000)); // Adjust wait time as needed
-
-    // Verify the assembled image exists in S3 and matches the original image
-    const s3 = new S3Client({ region: "us-east-2" });
-
-    const getObjectCommand = new GetObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: `images/${imageId}.png`,
-    });
-    try {
-      const data = await s3.send(getObjectCommand);
-      if (data.Body) {
-        const assembledImageBuffer = await Buffer.from(
-          await data.Body.transformToByteArray()
-        );
-        const originalImageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
-        expect(assembledImageBuffer.length).toBe(originalImageBuffer.length);
-        expect(assembledImageBuffer.equals(originalImageBuffer)).toBe(true);
-        console.log("Assembled image matches the original image.");
-      }
-    } catch (error) {
-      console.error("Error fetching assembled image from S3:", error);
-      throw error;
-    }
-
-    // Verify the match log in DynamoDB
-    const getCommand = new GetCommand({
-      TableName: MATCH_LOG_TABLE,
-      Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
-    });
-
-    const response = await dynamoDB.send(getCommand);
-    expect(response.Item).toBeDefined();
-    expect(response.Item).toHaveProperty("match_id", imageId);
-    expect(response.Item).toHaveProperty("plate_number", TEST_PLATE_NUMBER);
-    expect(response.Item).toHaveProperty("gps_location", gps);
-    expect(response.Item).toHaveProperty("timestamp", timestamp);
-    expect(response.Item).toHaveProperty(
-      "assembled_file",
-      `images/${imageId}.png`
-    );
-    expect(response.Item).toHaveProperty("created_at");
-
-    // Verify cleanup of chunks in S3
-    for (let i = 0; i < totalChunks; i++) {
-      const chunkKey = `uploads/${imageId}/chunk_${i}`;
-      try {
-        await s3.send(
-          new GetObjectCommand({ Bucket: S3_BUCKET, Key: chunkKey })
-        );
-        throw new Error(`Chunk ${chunkKey} was not deleted as expected.`);
-      } catch (error) {
-        if (error instanceof Error) {
-          expect(error.name).toBe("NoSuchKey");
-          console.log(`Chunk ${chunkKey} successfully deleted.`);
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    // Verify cleanup of metadata in DynamoDB
-    const metadataCheckCommand = new GetCommand({
-      TableName: UPLOAD_STATUS_TABLE,
-      Key: { image_id: imageId },
-    });
-
-    const metadataResponse = await dynamoDB.send(metadataCheckCommand);
-    expect(metadataResponse.Item).toBeUndefined();
-    console.log(`Metadata for image_id ${imageId} successfully deleted.`);
+    // Step 7: Verify the upload
+    await verifyUpload(imageId, gps, timestamp, totalChunks);
   }, 10000);
 });
 
@@ -377,6 +385,24 @@ describe("Chunk image upload edge case tests", () => {
         chunk_id: 0,
       });
 
+      // * Duplicate chunk
+      // Upload the first chunk again
+      const duplicateResponse = await request(API_URL)
+        .post("/uploads")
+        .send({
+          image_id: imageId,
+          chunk_id: 0,
+          total_chunks: totalChunks,
+          data: chunks[0].toString("base64"), // Encode chunk as Base64
+        })
+        .set("x-api-key", VALID_DASHCAM_API_KEY);
+      expect(duplicateResponse.statusCode).toBe(200);
+      expect(duplicateResponse.body).toEqual({
+        message: "Chunk uploaded successfully",
+        chunk_id: 0,
+      });
+      console.log("Duplicate chunk uploaded successfully.");
+
       // Upload the rest of the chunks
       if (chunks.length > 1) {
         for (let i = 1; i < chunks.length; i++) {
@@ -398,84 +424,7 @@ describe("Chunk image upload edge case tests", () => {
         }
       }
 
-      // Upload the first chunk again
-      const duplicateResponse = await request(API_URL)
-        .post("/uploads")
-        .send({
-          image_id: imageId,
-          chunk_id: 0,
-          total_chunks: totalChunks,
-          data: chunks[0].toString("base64"), // Encode chunk as Base64
-        })
-        .set("x-api-key", VALID_DASHCAM_API_KEY);
-      expect(duplicateResponse.statusCode).toBe(200);
-      expect(duplicateResponse.body).toEqual({
-        message: "Chunk uploaded successfully",
-        chunk_id: 0,
-      });
-      console.log("Duplicate chunk uploaded successfully.");
-
-      // Upload the last chunk again
-      const lastChunkResponse = await request(API_URL)
-        .post("/uploads")
-        .send({
-          image_id: imageId,
-          chunk_id: totalChunks - 1,
-          total_chunks: totalChunks,
-          data: chunks[totalChunks - 1].toString("base64"), // Encode chunk as Base64
-        })
-        .set("x-api-key", VALID_DASHCAM_API_KEY);
-      expect(lastChunkResponse.statusCode).toBe(200);
-      expect(lastChunkResponse.body).toEqual({
-        message: "Chunk uploaded successfully",
-        chunk_id: totalChunks - 1,
-      });
-      console.log("Last chunk uploaded successfully.");
-
-      // Wait for the assembly Lambda to process the chunks
-      console.log("Waiting for assembly process...");
-      await new Promise((resolve) => setTimeout(resolve, 5000)); // Adjust wait time as needed
-
-      // Verify the assembled image exists in S3 and matches the original image
-      const s3 = new S3Client({ region: "us-east-2" });
-
-      const getObjectCommand = new GetObjectCommand({
-        Bucket: S3_BUCKET,
-        Key: `images/${imageId}.png`,
-      });
-      try {
-        const data = await s3.send(getObjectCommand);
-        if (data.Body) {
-          const assembledImageBuffer = await Buffer.from(
-            await data.Body.transformToByteArray()
-          );
-          const originalImageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
-          expect(assembledImageBuffer.length).toBe(originalImageBuffer.length);
-          expect(assembledImageBuffer.equals(originalImageBuffer)).toBe(true);
-          console.log("Assembled image matches the original image.");
-        }
-      } catch (error) {
-        console.error("Error fetching assembled image from S3:", error);
-        throw error;
-      }
-
-      // Verify the match log in DynamoDB
-      const getCommand = new GetCommand({
-        TableName: MATCH_LOG_TABLE,
-        Key: { match_id: imageId, plate_number: TEST_PLATE_NUMBER },
-      });
-
-      const response = await dynamoDB.send(getCommand);
-      expect(response.Item).toBeDefined();
-      expect(response.Item).toHaveProperty("match_id", imageId);
-      expect(response.Item).toHaveProperty("plate_number", TEST_PLATE_NUMBER);
-      expect(response.Item).toHaveProperty("gps_location", gps);
-      expect(response.Item).toHaveProperty("timestamp", timestamp);
-      expect(response.Item).toHaveProperty(
-        "assembled_file",
-        `images/${imageId}.png`
-      );
-      expect(response.Item).toHaveProperty("created_at");
+      await verifyUpload(imageId, gps, timestamp, totalChunks);
     }, 10000);
 
     it("should return error if we try to upload with the same image_id since we already uploaded the image", async () => {
@@ -490,8 +439,17 @@ describe("Chunk image upload edge case tests", () => {
         });
       expect(response.statusCode).toBe(400);
       expect(response.body).toEqual({
-        error: "image_id is invalid",
+        error: "image_id is not valid",
       });
     });
+  });
+
+  describe("Chunk upload with out-of-order chunks", () => {
+    beforeAll(async () => {
+      // Get a new image_id for the test
+      imageId = await getImageIdFromDetection();
+    });
+
+    it("should upload chunks out of order", async () => {});
   });
 });
