@@ -236,7 +236,6 @@ describe("Chunk image upload edge case tests", () => {
 
   beforeAll(async () => {
     await addTestPlateToWatchlist();
-    imageId = await getImageIdFromDetection();
   });
 
   afterAll(async () => {
@@ -244,6 +243,10 @@ describe("Chunk image upload edge case tests", () => {
   });
 
   describe("API key validation", () => {
+    beforeAll(async () => {
+      imageId = await getImageIdFromDetection();
+    });
+
     it("should not be able to upload without api key", async () => {
       const response = await request(API_URL).post("/uploads").send({
         image_id: imageId,
@@ -272,6 +275,10 @@ describe("Chunk image upload edge case tests", () => {
   });
 
   describe("Chunk validation", () => {
+    beforeAll(async () => {
+      imageId = await getImageIdFromDetection();
+    });
+
     it("should return 400 error for missing image_id", async () => {
       const response = await request(API_URL)
         .post("/uploads")
@@ -354,6 +361,10 @@ describe("Chunk image upload edge case tests", () => {
   });
 
   describe("Chunk upload with duplicate chunks", () => {
+    beforeAll(async () => {
+      imageId = await getImageIdFromDetection();
+    });
+
     it("should successfully upload the full image", async () => {
       const imageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
 
@@ -442,5 +453,69 @@ describe("Chunk image upload edge case tests", () => {
         error: "image_id is not valid",
       });
     });
+  });
+
+  describe("Chunk upload with out-of-order chunks", () => {
+    beforeAll(async () => {
+      imageId = await getImageIdFromDetection();
+    });
+
+    it("should successfully upload the full image", async () => {
+      const imageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
+
+      const chunkSize = 8 * 1024; // 8KB
+      const chunks = [];
+      for (let i = 0; i < imageBuffer.length; i += chunkSize) {
+        chunks.push(imageBuffer.slice(i, i + chunkSize));
+      }
+
+      const totalChunks = chunks.length;
+
+      // Upload gps and timestamp for the second chunk
+      const gps = "37.7749,-122.4194";
+      const timestamp = new Date().toISOString();
+      const responseForSecondChunk = await request(API_URL)
+        .post("/uploads")
+        .send({
+          image_id: imageId,
+          chunk_id: 1,
+          total_chunks: totalChunks,
+          data: chunks[1].toString("base64"), // Encode chunk as Base64
+          gps_location: gps,
+          timestamp: timestamp,
+        })
+        .set("x-api-key", VALID_DASHCAM_API_KEY);
+      expect(responseForSecondChunk.statusCode).toBe(200);
+      expect(responseForSecondChunk.body).toEqual({
+        message: "Chunk uploaded successfully",
+        chunk_id: 1,
+      });
+      console.log("Chunk 1 uploaded successfully.");
+
+      // Upload the rest of the chunks
+      if (chunks.length > 1) {
+        for (let i = 0; i < chunks.length; i++) {
+          if (i === 1) continue; // Skip chunk 1 since it's already uploaded
+          const response = await request(API_URL)
+            .post("/uploads")
+            .send({
+              image_id: imageId,
+              chunk_id: i,
+              total_chunks: totalChunks,
+              data: chunks[i].toString("base64"), // Encode chunk as Base64
+            })
+            .set("x-api-key", VALID_DASHCAM_API_KEY);
+
+          expect(response.statusCode).toBe(200);
+          expect(response.body).toEqual({
+            message: "Chunk uploaded successfully",
+            chunk_id: i,
+          });
+        }
+      }
+      console.log("All chunks uploaded successfully.");
+
+      await verifyUpload(imageId, gps, timestamp, totalChunks);
+    }, 10000);
   });
 });
