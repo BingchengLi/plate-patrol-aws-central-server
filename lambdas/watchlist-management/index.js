@@ -28,9 +28,13 @@ exports.handler = async (event) => {
     if (httpMethod === "GET") {
       const params = { TableName: WATCHLIST_TABLE };
       const { Items } = await dynamoDB.send(new ScanCommand(params));
+
+      // Extract plate numbers from the Items array
+      const plateNumbers = Items.map((item) => item.plate_number);
+
       return {
         statusCode: 200,
-        body: JSON.stringify(Items || []),
+        body: JSON.stringify(plateNumbers || []),
       };
     }
 
