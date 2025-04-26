@@ -21,7 +21,7 @@ app.use("/webhook", webhookRoutes(uploads));
 // API route to get current uploads
 // Frontend: Use polling to get the current status of uploads for now
 // We can add websocket connections later if we have time
-app.get("/api/uploads/status", (req, res) => {
+app.get("/api/uploads", (req, res) => {
   res.json(uploads);
 });
 
