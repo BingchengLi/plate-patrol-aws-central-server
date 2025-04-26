@@ -16,7 +16,6 @@ module.exports = function (uploads) {
     // Save incoming tip
     uploads.push({
       image_id,
-      file,
       status,
       gps_location,
       timestamp,
