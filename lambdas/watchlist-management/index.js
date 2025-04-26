@@ -6,6 +6,7 @@ const {
   GetCommand,
   DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
+const { parse } = require("path");
 
 const client = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(client);
@@ -42,6 +43,30 @@ exports.handler = async (event) => {
       );
       const plateNumbers = Items?.map((item) => item.plate_number) || [];
       return { statusCode: 200, body: JSON.stringify(plateNumbers) };
+    }
+
+    // ---------------------- GET /plates/{plate_number} ----------------------
+    if (httpMethod === "GET" && resource === "/plates/{plate_number}") {
+      const plate_number = pathParameters?.plate_number;
+      if (!plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+      const getPlate = await dynamoDB.send(
+        new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
+      );
+      if (!getPlate.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: "Plate not found" }),
+        };
+      }
+      return {
+        statusCode: 200,
+        body: JSON.stringify(getPlate.Item),
+      };
     }
 
     // ---------------------- POST /plates ----------------------
@@ -149,8 +174,15 @@ exports.handler = async (event) => {
         };
       }
 
-      const webhook = DEMO_WEBHOOK_URL;
-      const timestamp = new Date().toISOString();
+      const { webhook_url } = JSON.parse(body || "{}");
+      if (!webhook_url) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "webhook_url is required" }),
+        };
+      }
+
+      const webhook = webhook_url || DEMO_WEBHOOK_URL; // Default to demo webhook URL if not provided
 
       const getPlate = await dynamoDB.send(
         new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
@@ -199,6 +231,16 @@ exports.handler = async (event) => {
         };
       }
 
+      const { webhook_url } = JSON.parse(body || "{}");
+      if (!webhook_url) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "webhook_url is required" }),
+        };
+      }
+
+      const webhook = webhook_url || DEMO_WEBHOOK_URL; // Default to demo webhook URL if not provided
+
       const getPlate = await dynamoDB.send(
         new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
       );
@@ -211,7 +253,7 @@ exports.handler = async (event) => {
       }
 
       const updatedWebhooks = (getPlate.Item.webhooks || []).filter(
-        (url) => url !== DEMO_WEBHOOK_URL
+        (url) => url !== webhook
       );
 
       if (updatedWebhooks.length === 0) {
