@@ -24,6 +24,16 @@ exports.handler = async (event) => {
   try {
     const { httpMethod, body, headers } = event;
 
+    // ========== Require API Key for all endpoints ==========
+    const apiKey = headers["x-api-key"];
+    if (!apiKey || !API_KEY_MAP[apiKey]) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: "Unauthorized: Invalid API Key" }),
+      };
+    }
+    const added_by = API_KEY_MAP[apiKey];
+
     // ================== GET /plates ==================
     if (httpMethod === "GET") {
       const params = { TableName: WATCHLIST_TABLE };
@@ -40,16 +50,6 @@ exports.handler = async (event) => {
 
     // ================== PUT /plates ==================
     if (httpMethod === "POST") {
-      // Extract API Key from headers
-      const apiKey = headers["x-api-key"];
-      if (!apiKey || !API_KEY_MAP[apiKey]) {
-        return {
-          statusCode: 403,
-          body: JSON.stringify({ error: "Unauthorized: Invalid API Key" }),
-        };
-      }
-
-      const added_by = API_KEY_MAP[apiKey];
       const { plate_number, reason } = JSON.parse(body || "{}");
 
       // Validate required fields
@@ -106,6 +106,7 @@ exports.handler = async (event) => {
       };
 
       await dynamoDB.send(new PutCommand(putAuditParams));
+      console.log("Audit log entry created:", putAuditParams.Item);
 
       return {
         statusCode: 200,
@@ -142,6 +143,21 @@ exports.handler = async (event) => {
           Key: { plate_number },
         })
       );
+
+      // Log action in audit_logs table
+      const timestamp = new Date().toISOString();
+      const putAuditParams = {
+        TableName: AUDIT_LOG_TABLE,
+        Item: {
+          log_id: `log-${Date.now()}`,
+          plate_number,
+          reason: "Removed from watchlist",
+          added_by,
+          timestamp,
+        },
+      };
+      await dynamoDB.send(new PutCommand(putAuditParams));
+      console.log("Audit log entry created:", putAuditParams.Item);
 
       return {
         statusCode: 200,
