@@ -151,6 +151,85 @@ exports.handler = async (event) => {
       };
     }
 
+    // ================== PATCH /plates/{plate_number}/webhooks ================
+    // Note: This is more like a "unsubscribe" endpoint
+    // It removes a webhook URL from the list of webhooks for a given plate
+    // This is useful for when an external service no longer wants to receive updates
+    // for a specific plate
+    if (httpMethod === "PATCH") {
+      if (!event.pathParameters || !event.pathParameters.plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+
+      const plate_number = event.pathParameters.plate_number;
+      const { webhook_url } = JSON.parse(body || "{}");
+
+      if (!webhook_url) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: "Missing required field: webhook_url",
+          }),
+        };
+      }
+
+      // Fetch the existing plate
+      const getParams = { TableName: WATCHLIST_TABLE, Key: { plate_number } };
+      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
+
+      if (!existingPlate.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: "Plate not found in watchlist" }),
+        };
+      }
+
+      const currentWebhooks = existingPlate.Item.webhook_urls || [];
+
+      // Remove the webhook_url if it exists
+      const updatedWebhooks = currentWebhooks.filter(
+        (url) => url !== webhook_url
+      );
+
+      if (updatedWebhooks.length === 0) {
+        // Delete plate entirely if no webhooks remain
+        await dynamoDB.send(
+          new DeleteCommand({
+            TableName: WATCHLIST_TABLE,
+            Key: { plate_number },
+          })
+        );
+
+        console.log(`Plate ${plate_number} deleted because no webhooks remain`);
+
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            message: "Plate deleted because no webhooks remain",
+          }),
+        };
+      }
+
+      const updateParams = {
+        TableName: WATCHLIST_TABLE,
+        Item: {
+          ...existingPlate.Item,
+          webhook_urls: updatedWebhooks,
+        },
+      };
+
+      await dynamoDB.send(new PutCommand(updateParams));
+      console.log(`Webhook URL removed for plate ${plate_number}.`);
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Webhook removed from plate" }),
+      };
+    }
+
     // ================== DELETE /plates/{plate_number} ==================
     if (httpMethod === "DELETE") {
       if (!event.pathParameters || !event.pathParameters.plate_number) {
