@@ -231,6 +231,7 @@ exports.handler = async (event) => {
     }
 
     // ================== DELETE /plates/{plate_number} ==================
+    // Only for internal use - not exposed to the public API
     if (httpMethod === "DELETE") {
       if (!event.pathParameters || !event.pathParameters.plate_number) {
         return {
