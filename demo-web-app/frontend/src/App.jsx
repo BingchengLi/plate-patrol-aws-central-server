@@ -1,5 +1,5 @@
 import React from "react";
-import UploadMonitor from "./pages/UploadMonitor"; // or whatever your page is
+import UploadMonitor from "./components/UploadMonitor";
 
 function App() {
   return (
