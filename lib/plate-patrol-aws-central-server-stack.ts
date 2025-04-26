@@ -122,16 +122,27 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       }
     );
 
-    // DELETE /plates/{plate_number} - Public API to remove a plate from the watchlist
-    platesResource
-      .addResource("{plate_number}")
+    const plateResource = platesResource.addResource("{plate_number}");
+
+    // PATCH /plates/{plate_number}/webhooks - Remove a webhook URL from a plate
+    plateResource
+      .addResource("webhooks")
       .addMethod(
-        "DELETE",
+        "PATCH",
         new apigateway.LambdaIntegration(watchlistManagementLambda),
         {
-          apiKeyRequired: true, // Require API Key for DELETE
+          apiKeyRequired: true, // Require API Key for PATCH too
         }
       );
+
+    // DELETE /plates/{plate_number} - Public API to remove a plate from the watchlist
+    plateResource.addMethod(
+      "DELETE",
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true, // Require API Key for DELETE
+      }
+    );
 
     // ================== /uploads API ==================
     const uploadsResource = api.root.addResource("uploads");
