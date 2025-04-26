@@ -66,7 +66,7 @@ exports.handler = async (event) => {
       }
 
       // Fallback to demo webhook URL if not provided
-      const webhookUrl = webhook_url || DEMO_WEBHOOK_URL;
+      const webhook = webhook_url || DEMO_WEBHOOK_URL;
 
       const timestamp = new Date().toISOString();
 
@@ -76,16 +76,16 @@ exports.handler = async (event) => {
 
       if (existingPlate.Item) {
         // Plate already exists - append webhook if not already tracking
-        const existingWebhooks = existingPlate.Item.webhookUrls || [];
+        const existingWebhooks = existingPlate.Item.webhooks || [];
 
-        if (!existingWebhooks.includes(webhookUrl)) {
-          existingWebhooks.push(webhookUrl);
+        if (!existingWebhooks.includes(webhook)) {
+          existingWebhooks.push(webhook);
 
           const updateParams = {
             TableName: WATCHLIST_TABLE,
             Item: {
               ...existingPlate.Item,
-              webhookUrls: existingWebhooks,
+              webhooks: existingWebhooks,
             },
           };
 
@@ -123,7 +123,7 @@ exports.handler = async (event) => {
         Item: {
           plate_number,
           reason,
-          webhook_urls: [webhook_url],
+          webhooks: [webhook],
         },
       };
 
