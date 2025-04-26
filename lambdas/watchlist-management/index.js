@@ -18,6 +18,9 @@ const API_KEY_MAP = {
   RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs: "dev",
 };
 
+// Fallback webhook URL for demo purposes
+const DEMO_WEBHOOK_URL = ""; // TODO: Add webhook URL for demo
+
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
@@ -48,9 +51,9 @@ exports.handler = async (event) => {
       };
     }
 
-    // ================== PUT /plates ==================
+    // ================== POST /plates ==================
     if (httpMethod === "POST") {
-      const { plate_number, reason } = JSON.parse(body || "{}");
+      const { plate_number, reason, webhook_url } = JSON.parse(body || "{}");
 
       // Validate required fields
       if (!plate_number || !reason) {
@@ -62,36 +65,70 @@ exports.handler = async (event) => {
         };
       }
 
+      // Fallback to demo webhook URL if not provided
+      const webhookUrl = webhook_url || DEMO_WEBHOOK_URL;
+
       const timestamp = new Date().toISOString();
 
       // Check if plate already exists
-      const getParams = {
-        TableName: WATCHLIST_TABLE,
-        Key: { plate_number },
-      };
-
+      const getParams = { TableName: WATCHLIST_TABLE, Key: { plate_number } };
       const existingPlate = await dynamoDB.send(new GetCommand(getParams));
 
       if (existingPlate.Item) {
-        console.log(`Plate ${plate_number} already exists. Skipping insert.`);
+        // Plate already exists - append webhook if not already tracking
+        const existingWebhooks = existingPlate.Item.webhookUrls || [];
+
+        if (!existingWebhooks.includes(webhookUrl)) {
+          existingWebhooks.push(webhookUrl);
+
+          const updateParams = {
+            TableName: WATCHLIST_TABLE,
+            Item: {
+              ...existingPlate.Item,
+              webhookUrls: existingWebhooks,
+            },
+          };
+
+          await dynamoDB.send(new PutCommand(updateParams));
+          console.log(`Webhook URL added for existing plate: ${plate_number}`);
+        } else {
+          console.log(`Webhook URL already exists for plate: ${plate_number}`);
+        }
+
+        // Log action in audit_logs table
+        const putAuditParams = {
+          TableName: AUDIT_LOG_TABLE,
+          Item: {
+            log_id: `log-${Date.now()}`,
+            plate_number,
+            reason,
+            added_by,
+            timestamp,
+          },
+        };
+        await dynamoDB.send(new PutCommand(putAuditParams));
+        console.log("Audit log entry created:", putAuditParams.Item);
+
         return {
           statusCode: 200,
           body: JSON.stringify({
-            message: "Plate already exists, skipping insert.",
+            message: "Plate already exists. Webhook added if new.",
           }),
         };
       }
 
-      // Add plate to watchlist
+      // Plate does not exist ➔ create new entry
       const putWatchlistParams = {
         TableName: WATCHLIST_TABLE,
         Item: {
           plate_number,
           reason,
+          webhook_urls: [webhook_url],
         },
       };
 
       await dynamoDB.send(new PutCommand(putWatchlistParams));
+      console.log(`New plate added: ${plate_number}`);
 
       // Log action in audit_logs table
       const putAuditParams = {
