@@ -99,39 +99,70 @@ export class PlatePatrolAwsCentralServerStack extends cdk.Stack {
       });
 
     // ================== /plates API ==================
-    // All endpoints under /plates are for watchlist management
-    // Note: The API Key is required for all endpoints under /plates
+    // Note: API Key is required for all endpoints to track usage and users
     const platesResource = api.root.addResource("plates");
 
+    // ------------------ internal endpoints ------------------
     // GET /plates - Get the list of plates in the watchlist
-    // Internal use only
     platesResource.addMethod(
       "GET",
       new apigateway.LambdaIntegration(watchlistManagementLambda),
       {
-        apiKeyRequired: true, // Require API Key for GET
+        apiKeyRequired: true, // Require API Key
       }
     );
 
-    // PUT /plates - Public API to add a plate to the watchlist
+    // POST /plates - Add a plate manually (internal use)
     platesResource.addMethod(
       "POST",
       new apigateway.LambdaIntegration(watchlistManagementLambda),
       {
-        apiKeyRequired: true, // Require API Key for POST
+        apiKeyRequired: true, // Require API Key
       }
     );
 
-    // DELETE /plates/{plate_number} - Public API to remove a plate from the watchlist
-    platesResource
-      .addResource("{plate_number}")
-      .addMethod(
-        "DELETE",
-        new apigateway.LambdaIntegration(watchlistManagementLambda),
-        {
-          apiKeyRequired: true, // Require API Key for DELETE
-        }
-      );
+    // /plates/{plate_number}
+    const plateResource = platesResource.addResource("{plate_number}");
+
+    // GET /plates/{plate_number}
+    plateResource.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // DELETE /plates/{plate_number} - Remove a plate manually
+    plateResource.addMethod(
+      "DELETE",
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // -------------------- public endpoints ------------------
+    // /plates/{plate_number}/webhooks
+    const plateWebhooksResource = plateResource.addResource("webhooks");
+
+    // POST /plates/{plate_number}/webhooks - Register a webhook
+    plateWebhooksResource.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true, // still using API Key to track usage and users
+      }
+    );
+
+    // DELETE /plates/{plate_number}/webhooks - Remove a webhook
+    plateWebhooksResource.addMethod(
+      "DELETE",
+      new apigateway.LambdaIntegration(watchlistManagementLambda),
+      {
+        apiKeyRequired: true,
+      }
+    );
 
     // ================== /uploads API ==================
     const uploadsResource = api.root.addResource("uploads");

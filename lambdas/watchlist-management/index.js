@@ -6,6 +6,7 @@ const {
   GetCommand,
   DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
+const { parse } = require("path");
 
 const client = new DynamoDBClient({});
 const dynamoDB = DynamoDBDocumentClient.from(client);
@@ -13,139 +14,271 @@ const dynamoDB = DynamoDBDocumentClient.from(client);
 const WATCHLIST_TABLE = process.env.WATCHLIST_TABLE;
 const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
 
-// Mapping of API keys to user identifiers
 const API_KEY_MAP = {
   RbC1Fostw07gDZQNEhqYz1UEKySIRKwE7mkMf7Hs: "dev",
 };
+
+const DEMO_WEBHOOK_URL = "";
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
   try {
-    const { httpMethod, body, headers } = event;
+    const { httpMethod, body, headers, pathParameters, resource } = event;
 
-    // ================== GET /plates ==================
-    if (httpMethod === "GET") {
-      const params = { TableName: WATCHLIST_TABLE };
-      const { Items } = await dynamoDB.send(new ScanCommand(params));
+    const apiKey = headers["x-api-key"];
+    if (!apiKey || !API_KEY_MAP[apiKey]) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: "Unauthorized" }),
+      };
+    }
+    const added_by = API_KEY_MAP[apiKey];
 
-      // Extract plate numbers from the Items array
-      const plateNumbers = Items.map((item) => item.plate_number);
+    // ========== Internal APIs ==========
+    // ---------------------- GET /plates ----------------------
+    if (httpMethod === "GET" && resource === "/plates") {
+      const { Items } = await dynamoDB.send(
+        new ScanCommand({ TableName: WATCHLIST_TABLE })
+      );
+      const plateNumbers = Items?.map((item) => item.plate_number) || [];
+      return { statusCode: 200, body: JSON.stringify(plateNumbers) };
+    }
 
+    // ---------------------- GET /plates/{plate_number} ----------------------
+    if (httpMethod === "GET" && resource === "/plates/{plate_number}") {
+      const plate_number = pathParameters?.plate_number;
+      if (!plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+      const getPlate = await dynamoDB.send(
+        new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
+      );
+      if (!getPlate.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: "Plate not found" }),
+        };
+      }
       return {
         statusCode: 200,
-        body: JSON.stringify(plateNumbers || []),
+        body: JSON.stringify(getPlate.Item),
       };
     }
 
-    // ================== PUT /plates ==================
-    if (httpMethod === "POST") {
-      // Extract API Key from headers
-      const apiKey = headers["x-api-key"];
-      if (!apiKey || !API_KEY_MAP[apiKey]) {
-        return {
-          statusCode: 403,
-          body: JSON.stringify({ error: "Unauthorized: Invalid API Key" }),
-        };
-      }
-
-      const added_by = API_KEY_MAP[apiKey];
-      const { plate_number, reason } = JSON.parse(body || "{}");
-
-      // Validate required fields
+    // ---------------------- POST /plates ----------------------
+    if (httpMethod === "POST" && resource === "/plates") {
+      const { plate_number, reason, webhook_url } = JSON.parse(body || "{}");
       if (!plate_number || !reason) {
         return {
           statusCode: 400,
-          body: JSON.stringify({
-            error: "Missing required fields: plate_number, reason",
-          }),
+          body: JSON.stringify({ error: "Missing plate_number or reason" }),
         };
       }
 
+      const webhook = webhook_url || DEMO_WEBHOOK_URL;
       const timestamp = new Date().toISOString();
 
-      // Check if plate already exists
-      const getParams = {
-        TableName: WATCHLIST_TABLE,
-        Key: { plate_number },
-      };
+      const getPlate = await dynamoDB.send(
+        new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
+      );
 
-      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
-
-      if (existingPlate.Item) {
-        console.log(`Plate ${plate_number} already exists. Skipping insert.`);
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            message: "Plate already exists, skipping insert.",
-          }),
-        };
+      if (getPlate.Item) {
+        const existingWebhooks = getPlate.Item.webhooks || [];
+        if (!existingWebhooks.includes(webhook)) {
+          existingWebhooks.push(webhook);
+          await dynamoDB.send(
+            new PutCommand({
+              TableName: WATCHLIST_TABLE,
+              Item: { ...getPlate.Item, webhooks: existingWebhooks },
+            })
+          );
+        }
+      } else {
+        await dynamoDB.send(
+          new PutCommand({
+            TableName: WATCHLIST_TABLE,
+            Item: { plate_number, reason, webhooks: [webhook] },
+          })
+        );
       }
 
-      // Add plate to watchlist
-      const putWatchlistParams = {
-        TableName: WATCHLIST_TABLE,
-        Item: {
-          plate_number,
-          reason,
-        },
-      };
-
-      await dynamoDB.send(new PutCommand(putWatchlistParams));
-
-      // Log action in audit_logs table
-      const putAuditParams = {
-        TableName: AUDIT_LOG_TABLE,
-        Item: {
-          log_id: `log-${Date.now()}`,
-          plate_number,
-          reason,
-          added_by,
-          timestamp,
-        },
-      };
-
-      await dynamoDB.send(new PutCommand(putAuditParams));
+      await dynamoDB.send(
+        new PutCommand({
+          TableName: AUDIT_LOG_TABLE,
+          Item: {
+            log_id: `log-${Date.now()}`,
+            plate_number,
+            reason,
+            added_by,
+            timestamp,
+          },
+        })
+      );
 
       return {
         statusCode: 200,
-        body: JSON.stringify({ message: "Plate added to watchlist" }),
+        body: JSON.stringify({ message: "Plate created/updated" }),
       };
     }
 
-    // ================== DELETE /plates/{plate_number} ==================
-    if (httpMethod === "DELETE") {
-      if (!event.pathParameters || !event.pathParameters.plate_number) {
+    // ---------------------- DELETE /plates/{plate_number} ----------------------
+    if (httpMethod === "DELETE" && resource === "/plates/{plate_number}") {
+      const plate_number = pathParameters?.plate_number;
+      if (!plate_number) {
         return {
           statusCode: 400,
           body: JSON.stringify({ error: "plate_number is required" }),
         };
       }
 
-      const plate_number = event.pathParameters.plate_number;
+      const timestamp = new Date().toISOString();
 
-      // Check if plate exists
-      const getParams = { TableName: WATCHLIST_TABLE, Key: { plate_number } };
-      const existingPlate = await dynamoDB.send(new GetCommand(getParams));
-
-      if (!existingPlate.Item) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ error: "Plate not found in watchlist" }),
-        };
-      }
-
-      // Remove plate from watchlist
       await dynamoDB.send(
-        new DeleteCommand({
-          TableName: WATCHLIST_TABLE,
-          Key: { plate_number },
+        new DeleteCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
+      );
+
+      await dynamoDB.send(
+        new PutCommand({
+          TableName: AUDIT_LOG_TABLE,
+          Item: {
+            log_id: `log-${Date.now()}`,
+            plate_number,
+            reason: "Manual removal",
+            added_by,
+            timestamp,
+          },
         })
       );
 
       return {
         statusCode: 200,
-        body: JSON.stringify({ message: "Plate removed from watchlist" }),
+        body: JSON.stringify({ message: "Plate removed" }),
+      };
+    }
+
+    // ========== Public APIs ==========
+    // ---------------------- POST /plates/{plate_number}/webhooks ----------------------
+    if (
+      httpMethod === "POST" &&
+      resource === "/plates/{plate_number}/webhooks"
+    ) {
+      const plate_number = pathParameters?.plate_number;
+      if (!plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+
+      const { webhook_url } = JSON.parse(body || "{}");
+      if (!webhook_url) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "webhook_url is required" }),
+        };
+      }
+
+      const webhook = webhook_url || DEMO_WEBHOOK_URL; // Default to demo webhook URL if not provided
+
+      const getPlate = await dynamoDB.send(
+        new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
+      );
+
+      if (getPlate.Item) {
+        const existingWebhooks = getPlate.Item.webhooks || [];
+        if (!existingWebhooks.includes(webhook)) {
+          existingWebhooks.push(webhook);
+          await dynamoDB.send(
+            new PutCommand({
+              TableName: WATCHLIST_TABLE,
+              Item: { ...getPlate.Item, webhooks: existingWebhooks },
+            })
+          );
+        }
+      } else {
+        await dynamoDB.send(
+          new PutCommand({
+            TableName: WATCHLIST_TABLE,
+            Item: {
+              plate_number,
+              reason: "Auto-created from webhook",
+              webhooks: [webhook],
+            },
+          })
+        );
+      }
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Webhook registered" }),
+      };
+    }
+
+    // ---------------------- DELETE /plates/{plate_number}/webhooks ----------------------
+    if (
+      httpMethod === "DELETE" &&
+      resource === "/plates/{plate_number}/webhooks"
+    ) {
+      const plate_number = pathParameters?.plate_number;
+      if (!plate_number) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "plate_number is required" }),
+        };
+      }
+
+      const { webhook_url } = JSON.parse(body || "{}");
+      if (!webhook_url) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: "webhook_url is required" }),
+        };
+      }
+
+      const webhook = webhook_url || DEMO_WEBHOOK_URL; // Default to demo webhook URL if not provided
+
+      const getPlate = await dynamoDB.send(
+        new GetCommand({ TableName: WATCHLIST_TABLE, Key: { plate_number } })
+      );
+
+      if (!getPlate.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: "Plate not found" }),
+        };
+      }
+
+      const updatedWebhooks = (getPlate.Item.webhooks || []).filter(
+        (url) => url !== webhook
+      );
+
+      if (updatedWebhooks.length === 0) {
+        await dynamoDB.send(
+          new DeleteCommand({
+            TableName: WATCHLIST_TABLE,
+            Key: { plate_number },
+          })
+        );
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ message: "Plate deleted" }),
+        };
+      }
+
+      await dynamoDB.send(
+        new PutCommand({
+          TableName: WATCHLIST_TABLE,
+          Item: { ...getPlate.Item, webhooks: updatedWebhooks },
+        })
+      );
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: "Webhook removed" }),
       };
     }
 
