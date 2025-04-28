@@ -2,30 +2,49 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const webhookRoutes = require("./routes/webhook");
+const { Server } = require("socket.io");
+const http = require("http");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" }, // Allow all origins
+});
+
 const PORT = process.env.PORT || 4000;
 
 // ========== MIDDLEWARE ==========
-app.use(cors()); // Allow frontend to talk to backend
-app.use(bodyParser.json()); // Parse JSON bodies
+app.use(cors());
+app.use(bodyParser.json());
 
 // ========== IN-MEMORY STORE ==========
-let uploads = []; // In-memory uploads detected from webhook - for demo purposes
+let uploads = [];
+
+// ========== SOCKET.IO ==========
+io.on("connection", (socket) => {
+  console.log("New client connected");
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+  });
+});
+
+// Make `io` available to routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // ========== ROUTES ==========
-
 // Webhook route
 app.use("/webhook", webhookRoutes(uploads));
 
-// API route to get current uploads
-// Frontend: Use polling to get the current status of uploads for now
-// We can add websocket connections later if we have time
+// API route for polling fallback
 app.get("/api/uploads", (req, res) => {
   res.json(uploads);
 });
 
 // ========== SERVER START ==========
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
