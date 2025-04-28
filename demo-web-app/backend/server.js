@@ -35,6 +35,7 @@ io.on("connection", (socket) => {
 app.use((req, res, next) => {
   req.io = io;
   req.matches = matches;
+  req.chunks = chunks;
   next();
 });
 
@@ -44,6 +45,11 @@ app.use("/webhook", webhookRoutes());
 // API route for polling fallback
 app.get("/api/matches", (req, res) => {
   res.json(matches.reverse()); // newest first
+});
+
+// API route for polling fallback
+app.get("/api/chunks", (req, res) => {
+  res.json(chunks.reverse()); // newest first
 });
 
 // ========== SERVER START ==========

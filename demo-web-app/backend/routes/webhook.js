@@ -33,7 +33,8 @@ module.exports = function () {
 
   // ========== Chunk Upload Activity Webhook ==========
   router.post("/chunk-upload-activity", (req, res) => {
-    const { image_id, chunk_id, total_chunks, chunk_data } = req.body;
+    const { image_id, chunk_id, total_chunks, data, gps_location, timestamp } =
+      req.body;
 
     if (!image_id || chunk_id === undefined || total_chunks === undefined) {
       return res.status(400).json({
@@ -45,11 +46,13 @@ module.exports = function () {
       image_id,
       chunk_id,
       total_chunks,
-      chunk_data, // base64 encoded data
+      data, // base64 encoded data
+      gps_location: gps_location || null,
+      timestamp: timestamp || null,
       received_at: new Date().toISOString(),
     };
 
-    chunks.push(newChunkEvent);
+    req.chunks.push(newChunkEvent);
     req.io.emit("new_chunk", newChunkEvent);
 
     res.status(200).json({ message: "Chunk upload activity received" });
