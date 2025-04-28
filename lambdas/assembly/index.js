@@ -154,8 +154,7 @@ exports.handler = async (event) => {
     console.log(`Sending webhook to ${webhookUrl}`);
 
     const webhookPayload = {
-      image_id: image_id,
-      file: assembledKey,
+      plate_number: plate_number,
       status: "complete",
       timestamp: timestamp,
       gps_location: gps_location,

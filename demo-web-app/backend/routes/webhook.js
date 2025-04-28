@@ -4,18 +4,20 @@ module.exports = function (uploads) {
   const router = express.Router();
 
   router.post("/image-complete", (req, res) => {
-    const { image_id, file, status, gps_location, timestamp, image_base64 } =
+    const { plate_number, status, gps_location, timestamp, image_base64 } =
       req.body;
 
-    if (!image_id || !status) {
-      return res.status(400).json({ error: "Missing image_id or status" });
+    if (!plate_number || !status) {
+      return res.status(400).json({
+        error: "Missing required fields: plate_number, status",
+      });
     }
 
-    console.log("Received webhook for image_id:", image_id);
+    console.log("Received webhook for plate_number:", plate_number);
 
     // Save incoming tip
     uploads.push({
-      image_id,
+      plate_number,
       status,
       gps_location,
       timestamp,

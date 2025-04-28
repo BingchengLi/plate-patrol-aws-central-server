@@ -9,7 +9,7 @@ const UploadMonitor = () => {
   useEffect(() => {
     const fetchUploads = async () => {
       try {
-        const response = await fetch("http://18.222.109.39:4000/api/uploads");
+        const response = await fetch("http://localhost:4000/api/uploads");
         const data = await response.json();
         setUploads(data.reverse()); // latest on top
         setLoading(false);
@@ -34,7 +34,7 @@ const UploadMonitor = () => {
         dataSource={uploads}
         renderItem={(item) => (
           <List.Item>
-            <Card title={`Image ID: ${item.image_id}`} bordered={true}>
+            <Card title={`Plate number: ${item.plate_number}`} bordered={true}>
               {item.image_base64 ? (
                 <img
                   src={`data:image/jpeg;base64,${item.image_base64}`}
@@ -47,6 +47,11 @@ const UploadMonitor = () => {
               <p>Status: {item.status}</p>
               <p>Timestamp: {new Date(item.timestamp).toLocaleString()}</p>
               {item.gps_location && <p>GPS: {item.gps_location}</p>}
+              {item.received_at && (
+                <p>
+                  Received at: {new Date(item.received_at).toLocaleString()}
+                </p>
+              )}
             </Card>
           </List.Item>
         )}
