@@ -53,21 +53,25 @@ const MatchFeed = () => {
           centered: true,
           width: 600,
           onOk: () => {
-            const updatedMatches = [
-              { ...newMatch, acknowledged: true },
-              ...matches,
-            ];
-            setMatches(updatedMatches);
-            localStorage.setItem("matches", JSON.stringify(updatedMatches));
+            setMatches((prevMatches) => {
+              const updatedMatches = [
+                { ...newMatch, acknowledged: true },
+                ...prevMatches,
+              ];
+              localStorage.setItem("matches", JSON.stringify(updatedMatches));
+              return updatedMatches;
+            });
             message.success("Match saved to feed!");
           },
           onCancel: () => {
-            const updatedMatches = [
-              { ...newMatch, acknowledged: false },
-              ...matches,
-            ];
-            setMatches(updatedMatches);
-            localStorage.setItem("matches", JSON.stringify(updatedMatches));
+            setMatches((prevMatches) => {
+              const updatedMatches = [
+                { ...newMatch, acknowledged: false },
+                ...prevMatches,
+              ];
+              localStorage.setItem("matches", JSON.stringify(updatedMatches));
+              return updatedMatches;
+            });
             message.info("Match dismissed.");
           },
         });

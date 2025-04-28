@@ -16,9 +16,11 @@ const ChunkFeed = () => {
     socket.on("new_chunk", (newChunk) => {
       console.log("New chunk received:", newChunk);
 
-      const updatedChunks = [newChunk, ...chunks];
-      setChunks(updatedChunks);
-      localStorage.setItem("chunks", JSON.stringify(updatedChunks));
+      setChunks((prevChunks) => {
+        const updatedChunks = [newChunk, ...prevChunks];
+        localStorage.setItem("chunks", JSON.stringify(updatedChunks));
+        return updatedChunks;
+      });
 
       const label = newChunk.plate_number
         ? `plate ${newChunk.plate_number}`
