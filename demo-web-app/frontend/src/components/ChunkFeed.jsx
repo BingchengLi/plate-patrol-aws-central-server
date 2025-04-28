@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, List, Spin, Modal, message, Tag } from "antd";
+import { Card, List, Spin, Modal, message, Tag, Alert } from "antd";
 import { io } from "socket.io-client";
 
 const ChunkFeed = () => {
@@ -27,14 +27,17 @@ const ChunkFeed = () => {
 
       setTimeout(() => {
         Modal.info({
-          title: "📦 New Chunk Uploaded",
+          title: "New Chunk Uploaded",
           content: (
             <div>
               <p>
                 <b>Image ID:</b> {newChunk.image_id}
               </p>
               <p>
-                <b>Chunk ID:</b> {newChunk.chunk_id} / {newChunk.total_chunks}
+                <b>Chunk ID:</b> {newChunk.chunk_id}
+              </p>
+              <p>
+                <b>Total Chunks:</b> {newChunk.total_chunks}
               </p>
               <p>
                 <b>Timestamp:</b>{" "}
@@ -85,6 +88,15 @@ const ChunkFeed = () => {
       <h2 style={{ fontSize: "2rem", marginTop: "0px", marginBottom: "24px" }}>
         📦 Chunk Upload Tracker
       </h2>
+
+      <Alert
+        message="Partial Image Warning"
+        description="Individual chunks may not always render a valid image. This happens because each chunk is only a fragment of the full file — the complete image will only be viewable after all chunks are assembled. Sometimes the first uploaded chunk may render a partial image, but most subsequent chunks will not display correctly. This is expected behavior."
+        type="warning"
+        showIcon
+        style={{ marginBottom: 24 }}
+      />
+
       <List
         grid={{ gutter: 16, column: 3 }}
         dataSource={chunks}
@@ -97,7 +109,6 @@ const ChunkFeed = () => {
                   Chunk {item.chunk_id + 1} / {item.total_chunks}
                 </Tag>
               }
-              bordered
             >
               {item.data ? (
                 <img
