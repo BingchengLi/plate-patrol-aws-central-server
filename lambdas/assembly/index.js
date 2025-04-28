@@ -152,27 +152,16 @@ exports.handler = async (event) => {
     // For demo purposes, we are using a hardcoded URL
     const webhookUrl = "http://18.222.109.39:4000/webhook/image-complete";
 
-    try {
-      await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_id: image_id,
-          file: assembledKey,
-          status: "complete",
-          timestamp: timestamp,
-          gps_location: gps_location,
-          image_base64: assembledBuffer.toString("base64"), // Encode the image
-        }),
-      });
+    const webhookPayload = {
+      image_id: image_id,
+      file: assembledKey,
+      status: "complete",
+      timestamp: timestamp,
+      gps_location: gps_location,
+      image_base64: assembledBuffer.toString("base64"),
+    };
 
-      console.log(`Webhook sent successfully for image_id: ${image_id}`);
-    } catch (webhookError) {
-      console.error(
-        `Failed to send webhook for image_id: ${image_id}`,
-        webhookError
-      );
-    }
+    await sendWebhookWithRetry(webhookUrl, webhookPayload);
 
     // Cleanup: Delete chunks from S3
     await Promise.all(
@@ -214,3 +203,39 @@ exports.handler = async (event) => {
     };
   }
 };
+
+async function sendWebhookWithRetry(
+  url,
+  payload,
+  maxRetries = 2,
+  delayMs = 2000
+) {
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      console.log(`Webhook attempt ${attempt} to ${url}`);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server responded with status ${res.status}`);
+      }
+
+      console.log(`Webhook sent successfully on attempt ${attempt}`);
+      return; // Success, exit function
+    } catch (error) {
+      console.error(`Webhook attempt ${attempt} failed:`, error.message);
+
+      if (attempt <= maxRetries) {
+        console.log(`Retrying webhook after ${delayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        console.error(
+          `All webhook attempts failed for image_id: ${payload.image_id}`
+        );
+      }
+    }
+  }
+}
