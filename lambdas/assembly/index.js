@@ -145,12 +145,13 @@ exports.handler = async (event) => {
     console.log(`Match event logged for image_id: ${image_id}`);
 
     // Send a webhook to notify the completion of the assembly
-    console.log(`Sending webhook to ${webhookUrl}`);
+    console.log(`Sending webhook notification for image_id: ${image_id}`);
 
     // In a real-world scenario, we will notify every webhook URL subscribed to
     // the plate_number (stored in WATCHLIST_TABLE)
     // For demo purposes, we are using a hardcoded URL
     const webhookUrl = "http://18.222.109.39:4000/webhook/image-complete";
+    console.log(`Sending webhook to ${webhookUrl}`);
 
     const webhookPayload = {
       image_id: image_id,
@@ -164,13 +165,14 @@ exports.handler = async (event) => {
     await sendWebhookWithRetry(webhookUrl, webhookPayload);
 
     // Cleanup: Delete chunks from S3
-    await Promise.all(
-      sortedChunks.map(async (chunk_id) => {
-        const chunkKey = `uploads/${image_id}/chunk_${chunk_id}`;
-        console.log(`Deleting chunk from S3: ${chunkKey}`);
-        await s3.send(
-          new DeleteObjectCommand({ Bucket: UPLOADS_BUCKET, Key: chunkKey })
-        );
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: UPLOADS_BUCKET,
+        Delete: {
+          Objects: sortedChunks.map((chunk_id) => ({
+            Key: `uploads/${image_id}/chunk_${chunk_id}`,
+          })),
+        },
       })
     );
 

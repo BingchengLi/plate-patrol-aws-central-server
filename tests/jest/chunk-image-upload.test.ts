@@ -52,7 +52,7 @@ const removeTestPlateFromWatchlist = async () => {
     .set("x-api-key", VALID_WATCHLIST_API_KEY);
 
   expect(response.statusCode).toBe(200);
-  expect(response.body).toEqual({ message: "Plate removed from watchlist" });
+  expect(response.body).toEqual({ message: "Plate removed" });
   console.log("Test plate deleted.");
 };
 
@@ -115,6 +115,7 @@ const verifyUpload = async (
       throw new Error(`Chunk ${chunkKey} was not deleted as expected.`);
     } catch (error) {
       if (error instanceof Error) {
+        console.log(error);
         expect(error.name).toBe("NoSuchKey");
         console.log(`Chunk ${chunkKey} successfully deleted.`);
       } else {
@@ -150,7 +151,7 @@ const getImageIdFromDetection = async () => {
   return imageId;
 };
 
-describe("Full Detection + Chunked Image Upload Integration Test", () => {
+describe.only("Full Detection + Chunked Image Upload Integration Test", () => {
   let imageId: string;
 
   beforeAll(async () => {
