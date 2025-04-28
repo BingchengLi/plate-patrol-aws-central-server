@@ -27,7 +27,7 @@ const MatchFeed = () => {
 
       setTimeout(() => {
         Modal.confirm({
-          title: "🚨 New Match Detected",
+          title: "New Match Detected",
           content: (
             <div>
               <p>
@@ -66,14 +66,14 @@ const MatchFeed = () => {
               { ...newMatch, acknowledged: true },
               ...prev,
             ]);
-            message.success("✅ Match saved to feed!");
+            message.success("Match saved to feed!");
           },
           onCancel: () => {
             setMatches((prev) => [
               { ...newMatch, acknowledged: false },
               ...prev,
             ]);
-            message.info("❌ Match dismissed.");
+            message.info("Match dismissed.");
           },
         });
       }, 0);
@@ -86,7 +86,11 @@ const MatchFeed = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>📸 Match Record</h2>
+      <h2
+        style={{ fontSize: "2rem", marginBottom: "24px", textAlign: "center" }}
+      >
+        📸 Match Record
+      </h2>
       <List
         grid={{ gutter: 16, column: 3 }}
         dataSource={matches}
