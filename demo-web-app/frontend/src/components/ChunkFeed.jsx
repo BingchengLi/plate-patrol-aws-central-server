@@ -16,56 +16,20 @@ const ChunkFeed = () => {
     socket.on("new_chunk", (newChunk) => {
       console.log("New chunk received:", newChunk);
 
-      setTimeout(() => {
-        Modal.info({
-          title: "New Chunk Uploaded",
-          content: (
-            <div>
-              <p>
-                <b>Image ID:</b> {newChunk.image_id}
-              </p>
-              <p>
-                <b>Chunk ID:</b> {newChunk.chunk_id}
-              </p>
-              <p>
-                <b>Total Chunks:</b> {newChunk.total_chunks}
-              </p>
-              <p>
-                <b>Timestamp:</b>{" "}
-                {newChunk.timestamp
-                  ? new Date(newChunk.timestamp).toLocaleString()
-                  : "Not included in chunk"}
-              </p>
-              <p>
-                <b>GPS:</b> {newChunk.gps_location || "Not included in chunk"}
-              </p>
-              {newChunk.data && (
-                <img
-                  src={`data:image/jpeg;base64,${newChunk.data}`}
-                  alt="Chunk Data"
-                  style={{
-                    width: "100%",
-                    maxHeight: "300px",
-                    objectFit: "contain",
-                    marginTop: "16px",
-                    borderRadius: "8px",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                  }}
-                />
-              )}
-            </div>
-          ),
-          okText: "Confirm",
-          centered: true,
-          width: 600,
-          onOk: () => {
-            const updatedChunks = [newChunk, ...chunks];
-            setChunks(updatedChunks);
-            localStorage.setItem("chunks", JSON.stringify(updatedChunks));
-            message.success("Chunk added to feed!");
-          },
-        });
-      }, 0);
+      const updatedChunks = [newChunk, ...chunks];
+      setChunks(updatedChunks);
+      localStorage.setItem("chunks", JSON.stringify(updatedChunks));
+
+      const label = newChunk.plate_number
+        ? `plate ${newChunk.plate_number}`
+        : `(image ID ${newChunk.image_id})`;
+
+      // Show a notification for the new chunk
+      message.info({
+        content: `Chunk ${newChunk.chunk_id + 1}/${
+          newChunk.total_chunks
+        } uploaded for ${label}`,
+      });
     });
 
     return () => socket.disconnect();
@@ -97,7 +61,7 @@ const ChunkFeed = () => {
 
       <Alert
         message="Partial Image Warning"
-        description="Chunks may not render fully valid images. Only assembled images are complete. This is expected."
+        description="Individual chunks may not always render a valid image. Each chunk is only a fragment of the full file — the complete image will only be viewable after all chunks are assembled. Sometimes the first uploaded chunk may render a partial image, but most subsequent chunks will not display correctly. This is expected behavior."
         type="warning"
         showIcon
         style={{ marginBottom: 24 }}
