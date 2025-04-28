@@ -17,7 +17,7 @@ const DemoHeader = () => {
         <Text>
           {" "}
           (pre-configured via plate subscriptions using{" "}
-          <Text code>/plates/{"{plate_number}"}/webhooks</Text> APIs):
+          <Text code>POST /plates/{"{plate_number}"}/webhooks</Text> APIs):
         </Text>
         <br />
         📸 <Text strong>Match Events</Text>:{" "}
