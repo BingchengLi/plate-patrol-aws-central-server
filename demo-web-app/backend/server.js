@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -8,7 +9,7 @@ const http = require("http");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" }, // Allow all origins
+  cors: { origin: "*" },
 });
 
 const PORT = process.env.PORT || 4000;
@@ -18,7 +19,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ========== IN-MEMORY STORE ==========
-let uploads = [];
+let matches = []; // <<< Changed from uploads -> matches
 
 // ========== SOCKET.IO ==========
 io.on("connection", (socket) => {
@@ -29,19 +30,19 @@ io.on("connection", (socket) => {
   });
 });
 
-// Make `io` available to routes
+// Make `io` and `matches` available to routes
 app.use((req, res, next) => {
   req.io = io;
+  req.matches = matches;
   next();
 });
 
 // ========== ROUTES ==========
-// Webhook route
-app.use("/webhook", webhookRoutes(uploads));
+app.use("/webhook", webhookRoutes);
 
 // API route for polling fallback
-app.get("/api/uploads", (req, res) => {
-  res.json(uploads);
+app.get("/api/matches", (req, res) => {
+  res.json(matches.reverse()); // newest first
 });
 
 // ========== SERVER START ==========

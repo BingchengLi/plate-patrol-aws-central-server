@@ -1,37 +1,49 @@
 import React, { useEffect, useState } from "react";
-import { Card, List, Spin } from "antd";
+import { Card, List, Spin, notification } from "antd";
+import { io } from "socket.io-client";
 
-const UploadMonitor = () => {
-  const [uploads, setUploads] = useState([]);
+const MatchFeed = () => {
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Poll every 3 seconds
   useEffect(() => {
-    const fetchUploads = async () => {
+    const fetchMatches = async () => {
       try {
-        const response = await fetch("http://localhost:4000/api/uploads");
+        const response = await fetch("http://localhost:4000/api/matches");
         const data = await response.json();
-        setUploads(data.reverse()); // latest on top
+        setMatches(data.reverse());
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching uploads:", error);
+        console.error("Error fetching matches:", error);
       }
     };
 
-    fetchUploads();
-    const interval = setInterval(fetchUploads, 3000); // refresh every 3s
+    fetchMatches();
 
-    return () => clearInterval(interval); // clean up
+    const socket = io("http://localhost:4000");
+
+    socket.on("new_match", (newMatch) => {
+      console.log("New match received:", newMatch);
+      setMatches((prev) => [newMatch, ...prev]);
+
+      notification.success({
+        message: "New match detected!",
+        description: `Plate number: ${newMatch.plate_number}`,
+        placement: "topRight",
+      });
+    });
+
+    return () => socket.disconnect();
   }, []);
 
-  if (loading) return <Spin tip="Loading uploads..." />;
+  if (loading) return <Spin tip="Loading matches..." />;
 
   return (
     <div style={{ padding: 24 }}>
-      <h2>Upload Monitor</h2>
+      <h2>Live Match Feed</h2>
       <List
         grid={{ gutter: 16, column: 3 }}
-        dataSource={uploads}
+        dataSource={matches}
         renderItem={(item) => (
           <List.Item>
             <Card title={`Plate number: ${item.plate_number}`} bordered={true}>
@@ -60,4 +72,4 @@ const UploadMonitor = () => {
   );
 };
 
-export default UploadMonitor;
+export default MatchFeed;

@@ -1,11 +1,11 @@
 import React from "react";
-import UploadMonitor from "./components/UploadMonitor";
+import MatchFeed from "./components/MatchFeed";
 
 function App() {
   return (
     <div>
       <h1>PlatePatrol Web App Wrapper (Only for demo purposes)</h1>
-      <UploadMonitor />
+      <MatchFeed />
     </div>
   );
 }
