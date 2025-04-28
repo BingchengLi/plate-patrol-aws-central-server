@@ -22,7 +22,7 @@ const VALID_WATCHLIST_API_KEY =
 const VALID_DASHCAM_API_KEY =
   process.env.VALID_DASHCAM_API_KEY ||
   "pXceWVib2h1ej16WgIaWs2JQzLk6RXUJ8mGylFFo";
-const TEST_PLATE_NUMBER = "CCC444";
+const TEST_PLATE_NUMBER = "JLG6633";
 const TEST_REASON = "Testing chunked image upload pipeline";
 const TEST_IMAGE_PATH = path.join(__dirname, "../assets/4kb-cropped.png");
 

@@ -151,7 +151,6 @@ exports.handler = async (event) => {
     // the plate_number (stored in WATCHLIST_TABLE)
     // For demo purposes, we are using a hardcoded URL
     const webhookUrl = "http://18.222.109.39:4000/webhook/image-complete";
-    console.log(`Sending webhook to ${webhookUrl}`);
 
     const webhookPayload = {
       plate_number: plate_number,
@@ -160,6 +159,8 @@ exports.handler = async (event) => {
       gps_location: gps_location,
       image_base64: assembledBuffer.toString("base64"),
     };
+
+    console.log("Webhook payload:", webhookPayload);
 
     await sendWebhookWithRetry(webhookUrl, webhookPayload);
 
@@ -221,6 +222,10 @@ async function sendWebhookWithRetry(
       });
 
       if (!res.ok) {
+        console.error(
+          `Webhook attempt ${attempt} failed with status: ${res.status}`
+        );
+        console.error(`Response body: ${await res.text()}`);
         throw new Error(`Server responded with status ${res.status}`);
       }
 
