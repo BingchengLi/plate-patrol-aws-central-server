@@ -1,11 +1,16 @@
 import React from "react";
-import UploadMonitor from "./components/UploadMonitor";
+import DemoHeader from "./components/DemoHeader";
+import MatchFeed from "./components/MatchFeed";
+import ChunkFeed from "./components/ChunkFeed";
+import { Divider } from "antd";
 
 function App() {
   return (
-    <div>
-      <h1>PlatePatrol Web App Wrapper (Only for demo purposes)</h1>
-      <UploadMonitor />
+    <div style={{ padding: "24px", fontFamily: "Arial, sans-serif" }}>
+      <DemoHeader />
+      <MatchFeed />
+      <Divider style={{ margin: "8px 0" }} />
+      <ChunkFeed />
     </div>
   );
 }

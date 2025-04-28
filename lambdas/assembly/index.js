@@ -2,7 +2,7 @@ const {
   S3Client,
   GetObjectCommand,
   PutObjectCommand,
-  DeleteObjectCommand,
+  DeleteObjectsCommand,
 } = require("@aws-sdk/client-s3");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
@@ -144,14 +144,35 @@ exports.handler = async (event) => {
 
     console.log(`Match event logged for image_id: ${image_id}`);
 
+    // Send a webhook to notify the completion of the assembly
+    console.log(`Sending webhook notification for image_id: ${image_id}`);
+
+    // In a real-world scenario, we will notify every webhook URL subscribed to
+    // the plate_number (stored in WATCHLIST_TABLE)
+    // For demo purposes, we are using a hardcoded URL
+    const webhookUrl = "http://18.222.109.39:4000/webhook/image-complete";
+
+    const webhookPayload = {
+      plate_number: plate_number,
+      status: "complete",
+      timestamp: timestamp,
+      gps_location: gps_location,
+      image_base64: assembledBuffer.toString("base64"),
+    };
+
+    console.log("Webhook payload:", webhookPayload);
+
+    await sendWebhookWithRetry(webhookUrl, webhookPayload);
+
     // Cleanup: Delete chunks from S3
-    await Promise.all(
-      sortedChunks.map(async (chunk_id) => {
-        const chunkKey = `uploads/${image_id}/chunk_${chunk_id}`;
-        console.log(`Deleting chunk from S3: ${chunkKey}`);
-        await s3.send(
-          new DeleteObjectCommand({ Bucket: UPLOADS_BUCKET, Key: chunkKey })
-        );
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: UPLOADS_BUCKET,
+        Delete: {
+          Objects: sortedChunks.map((chunk_id) => ({
+            Key: `uploads/${image_id}/chunk_${chunk_id}`,
+          })),
+        },
       })
     );
 
@@ -184,3 +205,43 @@ exports.handler = async (event) => {
     };
   }
 };
+
+async function sendWebhookWithRetry(
+  url,
+  payload,
+  maxRetries = 2,
+  delayMs = 2000
+) {
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      console.log(`Webhook attempt ${attempt} to ${url}`);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        console.error(
+          `Webhook attempt ${attempt} failed with status: ${res.status}`
+        );
+        console.error(`Response body: ${await res.text()}`);
+        throw new Error(`Server responded with status ${res.status}`);
+      }
+
+      console.log(`Webhook sent successfully on attempt ${attempt}`);
+      return; // Success, exit function
+    } catch (error) {
+      console.error(`Webhook attempt ${attempt} failed:`, error.message);
+
+      if (attempt <= maxRetries) {
+        console.log(`Retrying webhook after ${delayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        console.error(
+          `All webhook attempts failed for image_id: ${payload.image_id}`
+        );
+      }
+    }
+  }
+}

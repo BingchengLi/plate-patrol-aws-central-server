@@ -17,6 +17,11 @@ const UPLOADS_BUCKET = process.env.S3_BUCKET;
 const UPLOAD_STATUS_TABLE = process.env.UPLOAD_STATUS_TABLE;
 const ASSEMBLY_LAMBDA = process.env.ASSEMBLY_LAMBDA;
 
+// Webhook URL for chunk upload activity
+// This is only for demo purposes
+const WEBHOOK_CHUNK_URL =
+  "http://18.222.109.39:4000/webhook/chunk-upload-activity";
+
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
@@ -25,7 +30,6 @@ exports.handler = async (event) => {
     const { image_id, chunk_id, total_chunks, data, timestamp, gps_location } =
       JSON.parse(event.body);
 
-    // Check for required fields
     if (!image_id || chunk_id === undefined || !total_chunks || !data) {
       return {
         statusCode: 400,
@@ -36,7 +40,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Validate total_chunks - it should be a positive number
     if (isNaN(total_chunks) || total_chunks <= 0) {
       return {
         statusCode: 400,
@@ -46,22 +49,20 @@ exports.handler = async (event) => {
       };
     }
 
-    // Validate chunk_id - it should be a number that is smaller than total_chunks
     if (isNaN(chunk_id) || chunk_id < 0 || chunk_id >= total_chunks) {
       return {
         statusCode: 400,
         body: JSON.stringify({
-          error: "chunk_id must be a number between 0 and total_chunks - 1",
+          error: "chunk_id must be between 0 and total_chunks - 1",
         }),
       };
     }
 
-    // Validate image_id - there should be a record in UPLOAD_STATUS_TABLE
+    // Validate image_id exists
     const getImageIdParams = {
       TableName: UPLOAD_STATUS_TABLE,
       Key: { image_id },
     };
-
     const imageIdRecord = await dynamoDB.send(new GetCommand(getImageIdParams));
     if (!imageIdRecord.Item) {
       return {
@@ -72,7 +73,7 @@ exports.handler = async (event) => {
 
     console.log("Valid image_id found in DynamoDB:", imageIdRecord.Item);
 
-    // Store the chunk in S3
+    // Store chunk in S3
     const chunkKey = `uploads/${image_id}/chunk_${chunk_id}`;
     console.log("Storing chunk in S3:", chunkKey);
 
@@ -80,19 +81,11 @@ exports.handler = async (event) => {
       new PutObjectCommand({
         Bucket: UPLOADS_BUCKET,
         Key: chunkKey,
-        Body: Buffer.from(data, "base64"), // Assuming data is Base64 encoded
+        Body: Buffer.from(data, "base64"),
       })
     );
 
-    console.log("Chunk stored successfully in S3:", chunkKey);
-
-    // UPLOAD_STATUS_TABLE
-    // Primary Key: image_id
-    // Attributes:
-    // - received_chunks (list of chunk_ids)
-    // - total_chunks (number)
-    // - timestamp (optional) * should be updated only once with the first chunk
-    // - gps_location (optional) * should be updated only once with the first chunk
+    console.log("Chunk stored successfully:", chunkKey);
 
     // Update DynamoDB metadata
     const expressionAttributeValues = {
@@ -100,8 +93,6 @@ exports.handler = async (event) => {
       ":total_chunks": total_chunks,
       ":empty_list": [],
     };
-
-    // Add timestamp and gps_location to the update expression if provided
     if (timestamp) {
       expressionAttributeValues[":timestamp"] = timestamp;
     }
@@ -142,18 +133,34 @@ exports.handler = async (event) => {
       JSON.stringify(updatedRecord.Attributes, null, 2)
     );
 
+    // Send webhook for chunk upload activity
+    const newChunkEvent = {
+      image_id,
+      chunk_id,
+      total_chunks,
+      data, // base64 encoded
+      timestamp: timestamp || null,
+      gps_location: gps_location || null,
+      received_at: new Date().toISOString(),
+    };
+
+    console.log(`Sending chunk upload webhook to: ${WEBHOOK_CHUNK_URL}`);
+
+    // Send webhook in the background to avoid blocking
+    sendWebhookWithRetry(WEBHOOK_CHUNK_URL, newChunkEvent).catch((err) => {
+      console.error("Failed to send chunk webhook in background:", err.message);
+    });
+
     // Check if all chunks are received
     const { received_chunks } = updatedRecord.Attributes;
-    const uniqueChunks = Array.from(new Set(received_chunks)); // Deduplicate chunks
+    const uniqueChunks = Array.from(new Set(received_chunks));
 
     if (uniqueChunks.length === total_chunks) {
-      console.log("All chunks received. Triggering assembly process.");
-
-      // Invoke the assembly Lambda asynchronously
+      console.log("All chunks received, triggering assembly process.");
       await lambda.send(
         new InvokeCommand({
           FunctionName: ASSEMBLY_LAMBDA,
-          InvocationType: "Event", // Asynchronous invocation
+          InvocationType: "Event",
           Payload: JSON.stringify({ image_id }),
         })
       );
@@ -161,9 +168,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: "Chunk uploaded successfully",
         chunk_id,
@@ -178,3 +183,39 @@ exports.handler = async (event) => {
     };
   }
 };
+
+// Helper to retry webhook send
+async function sendWebhookWithRetry(
+  url,
+  payload,
+  maxRetries = 2,
+  delayMs = 1000
+) {
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        console.error(
+          `Webhook attempt ${attempt} failed with status: ${res.status}`
+        );
+        console.error(`Response body: ${await res.text()}`);
+        throw new Error(`Server responded with status ${res.status}`);
+      }
+
+      console.log(`Webhook sent successfully on attempt ${attempt}`);
+      return;
+    } catch (err) {
+      console.error(`Webhook attempt ${attempt} failed: ${err.message}`);
+      if (attempt < maxRetries + 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        console.error("All webhook retries failed.");
+      }
+    }
+  }
+}

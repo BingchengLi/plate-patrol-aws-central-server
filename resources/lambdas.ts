@@ -1,5 +1,6 @@
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -135,6 +136,7 @@ export class Lambdas {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: "index.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../lambdas/assembly")),
+      timeout: cdk.Duration.seconds(10), // Adjust timeout as needed
       environment: {
         MATCH_LOG_TABLE: matchLogTable,
         UPLOAD_STATUS_TABLE: uploadStatusTable,
