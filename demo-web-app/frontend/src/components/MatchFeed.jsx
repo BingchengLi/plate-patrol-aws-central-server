@@ -31,7 +31,7 @@ const MatchFeed = () => {
           content: (
             <div>
               <p>
-                <b>Plate:</b> {newMatch.plate_number}
+                <b>Plate number:</b> {newMatch.plate_number}
               </p>
               <p>
                 <b>Time:</b> {new Date(newMatch.timestamp).toLocaleString()}
@@ -95,7 +95,7 @@ const MatchFeed = () => {
         renderItem={(item) => (
           <List.Item>
             <Card
-              title={`Plate: ${item.plate_number}`}
+              title={`Plate number: ${item.plate_number}`}
               extra={
                 item.acknowledged !== undefined &&
                 (item.acknowledged ? (

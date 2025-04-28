@@ -24,7 +24,7 @@ const VALID_DASHCAM_API_KEY =
   "pXceWVib2h1ej16WgIaWs2JQzLk6RXUJ8mGylFFo";
 const TEST_PLATE_NUMBER = "CCC444";
 const TEST_REASON = "Testing chunked image upload pipeline";
-const TEST_IMAGE_PATH = path.join(__dirname, "../assets/45-kb-image-raw.jpg");
+const TEST_IMAGE_PATH = path.join(__dirname, "../assets/4kb-cropped.png");
 
 const UPLOAD_STATUS_TABLE =
   process.env.UPLOAD_STATUS_TABLE || "upload_status_staging";
@@ -174,7 +174,7 @@ describe.only("Full Detection + Chunked Image Upload Integration Test", () => {
     const imageBuffer = fs.readFileSync(TEST_IMAGE_PATH);
 
     // Step 4: Split the image into chunks
-    const chunkSize = 8 * 1024; // 8KB
+    const chunkSize = 2 * 1024; // 2KB
     const chunks = [];
     for (let i = 0; i < imageBuffer.length; i += chunkSize) {
       chunks.push(imageBuffer.slice(i, i + chunkSize));

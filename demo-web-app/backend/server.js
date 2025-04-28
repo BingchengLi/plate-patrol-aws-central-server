@@ -19,7 +19,8 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ========== IN-MEMORY STORE ==========
-let matches = []; // <<< Changed from uploads -> matches
+let matches = [];
+let chunks = [];
 
 // ========== SOCKET.IO ==========
 io.on("connection", (socket) => {

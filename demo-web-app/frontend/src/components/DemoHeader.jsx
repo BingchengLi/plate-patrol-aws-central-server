@@ -17,14 +17,16 @@ const DemoHeader = () => {
         <Text>
           {" "}
           (pre-configured via plate subscriptions using{" "}
-          <Text code>POST /plates/{"{plate_number}"}/webhooks</Text> APIs):
+          <Text code>POST /plates/{"{plate_number}"}/webhooks</Text> API):
         </Text>
         <br />
         📸 <Text strong>Match Events</Text>:{" "}
-        <Text code>https://18.222.109.39:4000/api/matches</Text>
+        <Text code>https://18.222.109.39:4000/webhook/image-complete</Text>
         <br />
         📦 <Text strong>Chunk Upload Activity</Text> (internal demo only):{" "}
-        <Text code>https://18.222.109.39:4000/api/chunks</Text>
+        <Text code>
+          https://18.222.109.39:4000/webhook/chunk-upload-activity
+        </Text>
       </Paragraph>
 
       <Paragraph>
