@@ -9,7 +9,7 @@ const UploadMonitor = () => {
   useEffect(() => {
     const fetchUploads = async () => {
       try {
-        const response = await fetch("http://localhost:4000/api/uploads");
+        const response = await fetch("http://18.222.109.39:4000/api/uploads");
         const data = await response.json();
         setUploads(data.reverse()); // latest on top
         setLoading(false);
