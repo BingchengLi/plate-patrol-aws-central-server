@@ -86,9 +86,7 @@ const MatchFeed = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <h2
-        style={{ fontSize: "2rem", marginBottom: "24px", textAlign: "center" }}
-      >
+      <h2 style={{ fontSize: "2rem", marginTop: "0px", marginBottom: "24px" }}>
         📸 Match Record
       </h2>
       <List
