@@ -38,7 +38,7 @@ app.use((req, res, next) => {
 });
 
 // ========== ROUTES ==========
-app.use("/webhook", webhookRoutes);
+app.use("/webhook", webhookRoutes());
 
 // API route for polling fallback
 app.get("/api/matches", (req, res) => {
