@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, List, Spin, Modal, message, Tag } from "antd";
+import { Card, List, Spin, Modal, message, Tag, Button } from "antd";
 import { io } from "socket.io-client";
 
 const MatchFeed = () => {
@@ -7,18 +7,9 @@ const MatchFeed = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMatches = async () => {
-      try {
-        const response = await fetch("http://localhost:4000/api/matches");
-        const data = await response.json();
-        setMatches(data.reverse());
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching matches:", error);
-      }
-    };
-
-    fetchMatches();
+    const savedMatches = JSON.parse(localStorage.getItem("matches") || "[]");
+    setMatches(savedMatches);
+    setLoading(false);
 
     const socket = io("http://localhost:4000");
 
@@ -62,17 +53,21 @@ const MatchFeed = () => {
           centered: true,
           width: 600,
           onOk: () => {
-            setMatches((prev) => [
+            const updatedMatches = [
               { ...newMatch, acknowledged: true },
-              ...prev,
-            ]);
+              ...matches,
+            ];
+            setMatches(updatedMatches);
+            localStorage.setItem("matches", JSON.stringify(updatedMatches));
             message.success("Match saved to feed!");
           },
           onCancel: () => {
-            setMatches((prev) => [
+            const updatedMatches = [
               { ...newMatch, acknowledged: false },
-              ...prev,
-            ]);
+              ...matches,
+            ];
+            setMatches(updatedMatches);
+            localStorage.setItem("matches", JSON.stringify(updatedMatches));
             message.info("Match dismissed.");
           },
         });
@@ -82,13 +77,30 @@ const MatchFeed = () => {
     return () => socket.disconnect();
   }, []);
 
+  const handleClearMatches = () => {
+    localStorage.removeItem("matches");
+    setMatches([]);
+    message.success("Match records cleared!");
+  };
+
   if (loading) return <Spin tip="Loading matches..." fullscreen />;
 
   return (
     <div style={{ padding: 24 }}>
-      <h2 style={{ fontSize: "2rem", marginTop: "0px", marginBottom: "24px" }}>
-        📸 Match Record
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
+        }}
+      >
+        <h2 style={{ fontSize: "2rem", margin: 0 }}> 📸 Match Record</h2>
+        <Button danger onClick={handleClearMatches}>
+          Clear Match Records
+        </Button>
+      </div>
+
       <List
         grid={{ gutter: 16, column: 3 }}
         dataSource={matches}
