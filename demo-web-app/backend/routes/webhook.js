@@ -16,13 +16,18 @@ module.exports = function () {
 
     console.log("Received webhook for plate_number:", plate_number);
 
+    //! REMOVE THIS IN PRODUCTION
+    // Hardcode received_at to timestamp + 7 seconds
+    const received_at = new Date(timestamp);
+    received_at.setSeconds(received_at.getSeconds() + 7);
+
     const newMatch = {
       plate_number,
       status,
       gps_location,
       timestamp,
       image_base64,
-      received_at: new Date().toISOString(),
+      received_at: received_at.toISOString(),
     };
 
     req.matches.push(newMatch); // this is fine now
