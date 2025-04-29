@@ -22,9 +22,9 @@ const VALID_WATCHLIST_API_KEY =
 const VALID_DASHCAM_API_KEY =
   process.env.VALID_DASHCAM_API_KEY ||
   "pXceWVib2h1ej16WgIaWs2JQzLk6RXUJ8mGylFFo";
-const TEST_PLATE_NUMBER = "JLG6633";
+const TEST_PLATE_NUMBER = "MNB4074";
 const TEST_REASON = "Testing chunked image upload pipeline";
-const TEST_IMAGE_PATH = path.join(__dirname, "../assets/4kb-cropped.png");
+const TEST_IMAGE_PATH = path.join(__dirname, "../assets/MNB4074.png");
 
 const UPLOAD_STATUS_TABLE =
   process.env.UPLOAD_STATUS_TABLE || "upload_status_staging";
@@ -59,7 +59,7 @@ const removeTestPlateFromWatchlist = async () => {
 const verifyUpload = async (
   imageId: string,
   gps: string,
-  timestamp: string,
+  timestamp: number,
   totalChunks: number
 ) => {
   // Wait for the assembly Lambda to process the chunks
@@ -184,8 +184,9 @@ describe.only("Full Detection + Chunked Image Upload Integration Test", () => {
 
     // Step 5: Upload each chunk via the /uploads API
     // Upload gps and timestamp for the first chunk
-    const gps = "37.7749,-122.4194";
-    const timestamp = new Date().toISOString();
+    const gps = "40.4410234,-79.9479569";
+    const timestamp = 1745769245.3043897; // Unix timestamp
+
     const initialResponse = await request(API_URL)
       .post("/uploads")
       .send({
@@ -379,7 +380,8 @@ describe("Chunk image upload edge case tests", () => {
 
       // Upload gps and timestamp for the first chunk
       const gps = "37.7749,-122.4194";
-      const timestamp = new Date().toISOString();
+      const timestamp = 1745769245.3043897; // Unix timestamp
+
       const initialResponse = await request(API_URL)
         .post("/uploads")
         .send({
@@ -474,7 +476,7 @@ describe("Chunk image upload edge case tests", () => {
 
       // Upload gps and timestamp for the second chunk
       const gps = "37.7749,-122.4194";
-      const timestamp = new Date().toISOString();
+      const timestamp = 1745769245.3043897; // Unix timestamp
       const responseForSecondChunk = await request(API_URL)
         .post("/uploads")
         .send({
