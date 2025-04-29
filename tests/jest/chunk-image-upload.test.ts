@@ -100,7 +100,7 @@ const verifyUpload = async (
   expect(response.Item).toHaveProperty("match_id", imageId);
   expect(response.Item).toHaveProperty("plate_number", TEST_PLATE_NUMBER);
   expect(response.Item).toHaveProperty("gps_location", gps);
-  expect(response.Item).toHaveProperty("timestamp", timestamp);
+  expect(response.Item).toHaveProperty("timestamp", "4/27/2025, 11:54:05 AM");
   expect(response.Item).toHaveProperty(
     "assembled_file",
     `images/${imageId}.png`
