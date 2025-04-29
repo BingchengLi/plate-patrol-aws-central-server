@@ -27,7 +27,7 @@ exports.handler = async (event) => {
 
   try {
     // Parse input data
-    const { image_id, chunk_id, total_chunks, data, timestamp, gps_location } =
+    let { image_id, chunk_id, total_chunks, data, timestamp, gps_location } =
       JSON.parse(event.body);
 
     if (!image_id || chunk_id === undefined || !total_chunks || !data) {
@@ -86,6 +86,13 @@ exports.handler = async (event) => {
     );
 
     console.log("Chunk stored successfully:", chunkKey);
+
+    // Convert unix timestamp to ISO string if provided
+    if (timestamp) {
+      timestamp = new Date(timestamp * 1000).toLocaleString("en-US", {
+        timeZone: "America/New_York",
+      });
+    }
 
     // Update DynamoDB metadata
     const expressionAttributeValues = {
